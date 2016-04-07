@@ -1,6 +1,6 @@
 # white-label-model
 
-[![Build Status](https://travis-ci.org/bshack/trndyModel.svg?branch=master)](https://travis-ci.org/bshack/trndyModel) [![Coverage Status](https://coveralls.io/repos/github/bshack/trndyModel/badge.svg?branch=master)](https://coveralls.io/github/bshack/trndyModel?branch=master)
+[![Build Status](https://travis-ci.org/bshack/white-label-model.svg?branch=master)](https://travis-ci.org/bshack/white-label-model) [![Coverage Status](https://coveralls.io/repos/github/bshack/white-label-model/badge.svg?branch=master)](https://coveralls.io/github/bshack/white-label-model?branch=master)
 
 A simple ES6 JS data model that emits events on data change. Offers support for collections of models.
 

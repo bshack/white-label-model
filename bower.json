@@ -1,5 +1,5 @@
 {
-  "name": "trndymodel",
+  "name": "white-label-model",
   "description": "A simple ES6 JS data model that emits events on data change. Offers support for collections of models.",
   "main": "dist/index.js",
   "authors": [
@@ -13,7 +13,7 @@
     "js",
     "events"
   ],
-  "homepage": "https://github.com/bshack/trndyModel",
+  "homepage": "https://github.com/bshack/white-label-model",
   "moduleType": [
     "amd"
   ],
@@ -21,5 +21,5 @@
     "**/.*",
     "node_modules"
   ],
-  "version": "1.0.15"
+  "version": "1.0.16"
 }
