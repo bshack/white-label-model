@@ -35,7 +35,6 @@ describe("A Model", function() {
                 self.initCallback();
             }
             extendedFunction() {
-
             }
         };
         modelColor = new ModelTest();
@@ -194,7 +193,6 @@ describe("A Collection", function() {
                 self.initCallback();
             }
             extendedFunction() {
-
             }
         };
         modelColor1 = new Model({
