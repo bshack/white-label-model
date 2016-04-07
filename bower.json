@@ -1,0 +1,25 @@
+{
+  "name": "trndymodel",
+  "description": "A simple ES6 JS data model that emits events on data change. Offers support for collections of models.",
+  "main": "dist/index.js",
+  "authors": [
+    "bshack"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "model",
+    "collection",
+    "javascript",
+    "js",
+    "events"
+  ],
+  "homepage": "https://github.com/bshack/trndyModel",
+  "moduleType": [
+    "amd"
+  ],
+  "ignore": [
+    "**/.*",
+    "node_modules"
+  ],
+  "version": "1.0.15"
+}
