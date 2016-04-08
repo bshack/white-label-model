@@ -33,6 +33,7 @@ describe("A Model", function() {
         const ModelTest = class extends Model {
             initialize() {
                 self.initCallback();
+                return this;
             }
             extendedFunction() {
             }
@@ -67,6 +68,11 @@ describe("A Model", function() {
     it("calls initialize function", function() {
         modelColor.initialize();
         expect(this.initCallback).toHaveBeenCalled();
+    });
+    it("calls initialize function and returns 'this'", function() {
+        let modelColor = new Model();
+        let result = modelColor.initialize();
+        expect(result).toEqual(jasmine.any(Object));
     });
     it("will save data in the model at instantiation", function() {
         modelColor = new Model({
@@ -192,6 +198,7 @@ describe("A Collection", function() {
         const CollectionTest = class extends Collection {
             initialize() {
                 self.initCallback();
+                return this;
             }
             extendedFunction() {
             }
@@ -238,6 +245,11 @@ describe("A Collection", function() {
     it("calls initialize function", function() {
         modelColors.initialize();
         expect(this.initCallback).toHaveBeenCalled();
+    });
+    it("calls initialize function and returns 'this'", function() {
+        let modelColors = new Collection();
+        let result = modelColors.initialize();
+        expect(result).toEqual(jasmine.any(Object));
     });
     it("will save data in the collection at instantiation", function() {
         modelColors = new Collection([
