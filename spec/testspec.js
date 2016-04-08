@@ -64,7 +64,8 @@ describe("A Model", function() {
     it("is has an delete function", function() {
         expect(modelColor.delete).toEqual(jasmine.any(Function));
     });
-    it("calls initialize function on instantiation", function() {
+    it("calls initialize function", function() {
+        modelColor.initialize();
         expect(this.initCallback).toHaveBeenCalled();
     });
     it("will save data in the model at instantiation", function() {
@@ -234,7 +235,8 @@ describe("A Collection", function() {
     it("is has an delete function", function() {
         expect(modelColors.delete).toEqual(jasmine.any(Function));
     });
-    it("calls initialize function on instantiation", function() {
+    it("calls initialize function", function() {
+        modelColors.initialize();
         expect(this.initCallback).toHaveBeenCalled();
     });
     it("will save data in the collection at instantiation", function() {

@@ -94,8 +94,6 @@
                     _this.set({});
                 }
 
-                _this.initialize();
-
                 return _this;
             }
 
@@ -161,8 +159,6 @@
                 } else {
                     _this2.set([]);
                 }
-
-                _this2.initialize();
 
                 return _this2;
             }

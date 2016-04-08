@@ -22,7 +22,7 @@
       <div class='fl pad1y space-right2'>
         <span class="strong">100% </span>
         <span class="quiet">Statements</span>
-        <span class='fraction'>280/280</span>
+        <span class='fraction'>282/282</span>
       </div>
       <div class='fl pad1y space-right2'>
         <span class="strong">100% </span>
@@ -37,7 +37,7 @@
       <div class='fl pad1y space-right2'>
         <span class="strong">100% </span>
         <span class="quiet">Lines</span>
-        <span class='fraction'>280/280</span>
+        <span class='fraction'>282/282</span>
       </div>
     </div>
   </div>
@@ -609,20 +609,16 @@
 <span class="cline-any cline-yes">21×</span>
 <span class="cline-any cline-yes">21×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">21×</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">21×</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1×</span>
-<span class="cline-any cline-yes">21×</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">21×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1×</span>
-<span class="cline-any cline-yes">1×</span>
+<span class="cline-any cline-yes">21×</span>
+<span class="cline-any cline-yes">21×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-yes">1×</span>
@@ -642,6 +638,10 @@
 <span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1×</span>
+<span class="cline-any cline-yes">1×</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -768,13 +768,9 @@
 <span class="cline-any cline-yes">35×</span>
 <span class="cline-any cline-yes">35×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">35×</span>
+<span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">35×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">35×</span>
@@ -785,6 +781,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">35×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">35×</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-yes">35×</span>
 <span class="cline-any cline-yes">35×</span>
@@ -813,6 +812,7 @@
 <span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-yes">1×</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1144,7 +1144,6 @@ describe("A Model", function() {
                 self.initCallback();
             }
             extendedFunction<span class="fstat-no" title="function not covered" >() {</span>
-&nbsp;
             }
         };
         modelColor = new ModelTest();
@@ -1174,7 +1173,8 @@ describe("A Model", function() {
     it("is has an delete function", function() {
         expect(modelColor.delete).toEqual(jasmine.any(Function));
     });
-    it("calls initialize function on instantiation", function() {
+    it("calls initialize function", function() {
+        modelColor.initialize();
         expect(this.initCallback).toHaveBeenCalled();
     });
     it("will save data in the model at instantiation", function() {
@@ -1303,7 +1303,6 @@ describe("A Collection", function() {
                 self.initCallback();
             }
             extendedFunction<span class="fstat-no" title="function not covered" >() {</span>
-&nbsp;
             }
         };
         modelColor1 = new Model({
@@ -1345,7 +1344,8 @@ describe("A Collection", function() {
     it("is has an delete function", function() {
         expect(modelColors.delete).toEqual(jasmine.any(Function));
     });
-    it("calls initialize function on instantiation", function() {
+    it("calls initialize function", function() {
+        modelColors.initialize();
         expect(this.initCallback).toHaveBeenCalled();
     });
     it("will save data in the collection at instantiation", function() {
@@ -1645,7 +1645,7 @@ describe("A Collection", function() {
 </div><!-- /wrapper -->
 <div class='footer quiet pad2 space-top1 center small'>
   Code coverage
-  generated by <a href="http://istanbul-js.org/" target="_blank">istanbul</a> at Thu Apr 07 2016 12:26:59 GMT-0400 (EDT)
+  generated by <a href="http://istanbul-js.org/" target="_blank">istanbul</a> at Thu Apr 07 2016 21:52:55 GMT-0400 (EDT)
 </div>
 </div>
 <script src="../prettify.js"></script>

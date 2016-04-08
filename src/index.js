@@ -14,14 +14,13 @@ import _ from 'lodash';
         constructor(modelData) {
 
             super();
+            
             // where the data is held for the model
             if (modelData && _.isObject(modelData)) {
                 this.set(modelData);
             } else {
                 this.set({});
             }
-
-            this.initialize();
 
         }
 
@@ -73,15 +72,15 @@ import _ from 'lodash';
     const Collection = class extends EventEmitter {
 
         constructor(collectionData) {
+
             super();
+
             // where the data is held for the collection
             if (collectionData && _.isArray(collectionData)) {
                 this.set(collectionData);
             } else {
                 this.set([]);
             }
-
-            this.initialize();
 
         }
 
