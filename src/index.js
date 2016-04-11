@@ -184,8 +184,6 @@ import _ from 'lodash';
                         this.emit('change', this.get());
                         this.emit('update', this.get());
                         return true;
-                    } else {
-                        return false;
                     }
 
                 } else if (_.isMap(this.get())) {
@@ -208,12 +206,8 @@ import _ from 'lodash';
                         this.emit('change', this.get());
                         this.emit('update', this.get());
                         return true;
-                    } else {
-                        return false;
                     }
 
-                } else {
-                    return false;
                 }
 
             } else if (_.isArray(index) || _.isMap(index)) {
@@ -229,6 +223,7 @@ import _ from 'lodash';
 
         // the deleter
         delete(index) {
+            
             if (!_.isUndefined(index)) {
 
                 if (_.isArray(this.get()) && this.get(index)) {
@@ -255,9 +250,8 @@ import _ from 'lodash';
                 this.emit('change', this.get());
                 this.emit('delete', this.get());
                 return true;
-            } else {
-                return false;
             }
+
         };
 
     };
