@@ -120,7 +120,7 @@ This will emit 'change' and 'delete' events.
 
 ## Collection Usage
 
-Collections are arrays. They can hold models or any other data types.
+Collections can be either arrays or maps. They will default to arrays unless otherwise set. They can hold models or any other data types.
 
 ### Require
 
@@ -147,11 +147,25 @@ var modelColor3 = new Model({
 
 Now create a new collection to hold the models.
 
+If you want your collection to be an array:
+
 ```
 var modelColors = new Collection();
 ```
+or
+```
+var modelColors = new Collection(new Array());
+```
+
+If you want your collection to be a map:
+
+```
+var modelColors = new Collection(new Map());
+```
 
 Optionally you can also set the collection data at instantiation:
+
+array
 
 ```
 var modelColors = new Collection([
@@ -159,6 +173,16 @@ var modelColors = new Collection([
     modelColor2,
     modelColor3
 ]);
+```
+
+map
+
+```
+var modelColors = new Collection(new Map([
+    ['color1', modelColor1],
+    ['color2', modelColor2],
+    ['color3', modelColor3]
+]));
 ```
 
 ## Extend
@@ -207,7 +231,9 @@ Whenever these models or this collection change they will emit a 'change' event.
 
 ### Set
 
-Set the collection array contents:
+Set the collection contents:
+
+array
 
 ```
 modelColor1.set([
@@ -217,11 +243,23 @@ modelColor1.set([
 ]);
 ```
 
-The data must be in an array and this will overwrite any existing array data stored completely. This will emit 'change' and 'set' events.
+map
+
+```
+var modelColors = new Collection(new Map([
+    ['color1', modelColor1],
+    ['color2', modelColor2],
+    ['color3', modelColor3]
+]));
+```
+
+The data must be in an array or map and this will overwrite any existing array data stored completely. This will emit 'change' and 'set' events.
 
 ### Push
 
-Add single items to the end of the stored collection array:
+Add single items to the end of the stored collection:
+
+array
 
 ```
 modelColors.push(modelColor1);
@@ -229,7 +267,17 @@ modelColors.push(modelColor2);
 modelColors.push(modelColor3);
 ```
 
-or add multiple items to the end of the stored collection array:
+map
+
+```
+modelColors.push('color1', modelColor1);
+modelColors.push('color2', modelColor2);
+modelColors.push('color3', modelColor3);
+```
+
+or add multiple items to the end of the stored collection:
+
+array
 
 ```
 modelColor1.push([
@@ -239,28 +287,56 @@ modelColor1.push([
 ]);
 ```
 
+map
+
+```
+modelColor1.push(new Map([
+    ['color1', modelColor1],
+    ['color2', modelColor2],
+    ['color3', modelColor3]
+]));
+```
+
 This will emit 'change' and 'push' events.
 
 ### Get
 
-This returns then entire collection data array:
+This returns then entire collection data:
 
 ```
 var allColors = modelColors.get();
 ```
 
-This returns only a single item from the collection array at the specified index:
+This returns only a single item from the collection at the specified index:
+
+array
 
 ```
 var greenData = modelColors.get(1);
 ```
 
+map
+
+```
+var greenData = modelColors.get('color2');
+```
+
 ### Update
 
-This updates a single item in the collection array with new object data at the specified index:
+This updates a single item in the collection with new object data at the specified index:
+
+array
 
 ```
 modelColors.update(1, {
+    isPrimaryColor: true
+});
+```
+
+map
+
+```
+modelColors.update('color2', {
     isPrimaryColor: true
 });
 ```
@@ -269,13 +345,23 @@ This extends the existing item object data, old properties are overwritten, new 
 
 or when the item data type is not an object it will simply overwrite completely the old data with new:
 
+array
+
 ```
 modelColors.update(1, true);
+```
+
+map
+
+```
+modelColors.update('color2', true);
 ```
 
 This will emit 'change' and 'update' events on the collection and on the item if it is a model.
 
 When you don't pass in an index argument the collection is updated with all new data:
+
+array
 
 ```
 modelColors.update([
@@ -294,22 +380,49 @@ modelColors.update([
 ]);
 ```
 
-The new data must be an array. This will emit 'change' and 'update' events only on the collection.
+map
+
+```
+modelColors.update([
+    ['color1', new Model({
+        name: 'cyan'
+    })],
+    ['color2', new Model({
+        name: 'magenta'
+    })],
+    ['color3', new Model({
+        name: 'yellow'
+    })],
+    ['color4', new Model({
+        name: 'black'
+    })]
+]);
+```
+
+The new data must be an array or map. This will emit 'change' and 'update' events only on the collection.
 
 ### Delete
 
 This deletes a model from the collection at the specified index:
 
+array
+
 ```
 modelColors.delete(2);
 ```
 
+map
+
+```
+modelColors.delete('color3');
+```
+
 This will emit 'change' and 'delete' events.
 
-This sets the collection data to an empty array.
+This sets the collection data to an empty array or map.
 
 ```
 modelColors.delete();
 ```
 
-This will emit 'change' and 'delete' events.
+It respect the previous data type. For example if it was a map it will set it to an empty map. This will emit 'change' and 'delete' events.
