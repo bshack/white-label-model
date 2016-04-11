@@ -14,12 +14,12 @@ import _ from 'lodash';
         constructor(modelData) {
 
             super();
-            
+
             // where the data is held for the model
             if (modelData && _.isObject(modelData)) {
                 this.set(modelData);
             } else {
-                this.set({});
+                this.set(new Object());
             }
 
         }
@@ -69,6 +69,10 @@ import _ from 'lodash';
 
     };
 
+    /*
+    Collection
+    */
+
     const Collection = class extends EventEmitter {
 
         constructor(collectionData) {
@@ -76,10 +80,10 @@ import _ from 'lodash';
             super();
 
             // where the data is held for the collection
-            if (collectionData && _.isArray(collectionData)) {
+            if (collectionData && (_.isArray(collectionData) || _.isMap(collectionData))) {
                 this.set(collectionData);
             } else {
-                this.set([]);
+                this.set(new Array());
             }
 
         }
@@ -93,7 +97,7 @@ import _ from 'lodash';
         // the setter
         set(data) {
 
-            if (_.isArray(data)) {
+            if (_.isArray(data) || _.isMap(data)) {
                 this.collectionData = data;
                 this.emit('change', this.get());
                 this.emit('set', this.get());
@@ -105,20 +109,46 @@ import _ from 'lodash';
         };
 
         // the pusher
-        push(data) {
-            if (data) {
-                this.set(_.concat(this.get(), data));
+        push(key, data) {
+
+            //get the data
+            const savedData = this.get();
+
+            // if we are adding one item to a Map
+            if (key && data) {
+                savedData.set(key, data);
+                this.set(savedData);
+                this.emit('change', this.get());
+                this.emit('push', this.get());
+                return true;
+            } else {
+                data = key;
+            }
+
+            if (_.isMap(data)) {
+                data.forEach(function(value, key) {
+                    savedData.set(key, value);
+                });
+                this.set(savedData);
+                this.emit('change', this.get());
+                this.emit('push', this.get());
+                return true;
+            } else if (data) {
+                this.set(_.concat(savedData, data));
                 this.emit('change', this.get());
                 this.emit('push', this.get());
                 return true;
             } else {
                 return false;
             }
+
         };
 
         // the getter
         get(index) {
-            if (_.isNumber(index)) {
+            if (index && _.isMap(this.collectionData)) {
+                return this.collectionData.get(index);
+            } else if (_.isNumber(index)) {
                 return this.collectionData[index];
             } else {
                 return this.collectionData;

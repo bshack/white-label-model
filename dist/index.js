@@ -91,7 +91,7 @@
                 if (modelData && _.isObject(modelData)) {
                     _this.set(modelData);
                 } else {
-                    _this.set({});
+                    _this.set(new Object());
                 }
 
                 return _this;
@@ -145,6 +145,10 @@
             return Model;
         }(EventEmitter);
 
+        /*
+        Collection
+        */
+
         var Collection = function (_EventEmitter2) {
             _inherits(Collection, _EventEmitter2);
 
@@ -154,10 +158,10 @@
                 var _this2 = _possibleConstructorReturn(this, Object.getPrototypeOf(Collection).call(this));
 
                 // where the data is held for the collection
-                if (collectionData && _.isArray(collectionData)) {
+                if (collectionData && (_.isArray(collectionData) || _.isMap(collectionData))) {
                     _this2.set(collectionData);
                 } else {
-                    _this2.set([]);
+                    _this2.set(new Array());
                 }
 
                 return _this2;
@@ -173,7 +177,7 @@
                 key: 'set',
                 value: function set(data) {
 
-                    if (_.isArray(data)) {
+                    if (_.isArray(data) || _.isMap(data)) {
                         this.collectionData = data;
                         this.emit('change', this.get());
                         this.emit('set', this.get());
@@ -184,9 +188,32 @@
                 }
             }, {
                 key: 'push',
-                value: function push(data) {
-                    if (data) {
-                        this.set(_.concat(this.get(), data));
+                value: function push(key, data) {
+
+                    //get the data
+                    var savedData = this.get();
+
+                    // if we are adding one item to a Map
+                    if (key && data) {
+                        savedData.set(key, data);
+                        this.set(savedData);
+                        this.emit('change', this.get());
+                        this.emit('push', this.get());
+                        return true;
+                    } else {
+                        data = key;
+                    }
+
+                    if (_.isMap(data)) {
+                        data.forEach(function (value, key) {
+                            savedData.set(key, value);
+                        });
+                        this.set(savedData);
+                        this.emit('change', this.get());
+                        this.emit('push', this.get());
+                        return true;
+                    } else if (data) {
+                        this.set(_.concat(savedData, data));
                         this.emit('change', this.get());
                         this.emit('push', this.get());
                         return true;
@@ -197,7 +224,9 @@
             }, {
                 key: 'get',
                 value: function get(index) {
-                    if (_.isNumber(index)) {
+                    if (index && _.isMap(this.collectionData)) {
+                        return this.collectionData.get(index);
+                    } else if (_.isNumber(index)) {
                         return this.collectionData[index];
                     } else {
                         return this.collectionData;
