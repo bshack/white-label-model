@@ -88,7 +88,7 @@
                 var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(Model).call(this));
 
                 // where the data is held for the model
-                if (modelData && _.isObject(modelData)) {
+                if (modelData && _.isPlainObject(modelData)) {
                     _this.set(modelData);
                 } else {
                     _this.set(new Object());
@@ -105,7 +105,7 @@
             }, {
                 key: 'set',
                 value: function set(data) {
-                    if (data && _.isObject(data)) {
+                    if (data && _.isPlainObject(data)) {
                         this.modelData = data;
                         this.emit('change', this.get());
                         this.emit('set', this.get());
@@ -123,7 +123,7 @@
                 key: 'update',
                 value: function update(updateData) {
 
-                    if (updateData && _.isObject(updateData)) {
+                    if (updateData && _.isPlainObject(updateData)) {
                         this.set(_.extend(this.get(), updateData));
                         this.emit('change', this.get());
                         this.emit('update', this.get());
@@ -235,18 +235,45 @@
             }, {
                 key: 'update',
                 value: function update(index, updateData) {
-                    // if updating an item in the array
-                    if (_.isNumber(index) && this.get(index)) {
-                        // if we are updating a model
-                        if (_.isObject(updateData) && this.get(index).get && _.isObject(this.get(index).get())) {
-                            this.get(index).set(_.extend(this.get(index).get(), updateData));
-                            this.get(index).emit('change', this.get(index).get());
-                            this.get(index).emit('update', this.get(index).get());
-                            this.emit('change', this.get());
-                            this.emit('update', this.get());
-                            return true;
-                            // if we are updating a standard object
-                        } else if (_.isObject(updateData) && _.isObject(this.get(index))) {
+                    // if updating an item in the array or plain object
+                    if (!_.isUndefined(index) && !_.isUndefined(updateData) && this.get(index)) {
+
+                        // if the collection is an array
+                        if (_.isNumber(index) && _.isArray(this.get())) {
+
+                            // if we are updating a model
+                            if (_.isPlainObject(updateData) && this.get(index).get && _.isPlainObject(this.get(index).get())) {
+                                this.get(index).set(_.extend(this.get(index).get(), updateData));
+                                this.get(index).emit('change', this.get(index).get());
+                                this.get(index).emit('update', this.get(index).get());
+                                this.emit('change', this.get());
+                                this.emit('update', this.get());
+                                return true;
+                                // if we are updating a standard object
+                            } else if (_.isPlainObject(updateData) && _.isPlainObject(this.get(index))) {
+                                    this.collectionData[index] = _.extend(this.get(index), updateData);
+                                    this.emit('change', this.get());
+                                    this.emit('update', this.get());
+                                    return true;
+                                } else if (updateData) {
+                                    this.collectionData[index] = updateData;
+                                    this.emit('change', this.get());
+                                    this.emit('update', this.get());
+                                    return true;
+                                } else {
+                                    return false;
+                                }
+                        } else if (_.isMap(this.get())) {
+
+                            // if we are updating a model
+                            if (_.isPlainObject(updateData) && this.get(index).get && _.isPlainObject(this.get(index).get())) {
+                                this.get(index).set(_.extend(this.get(index).get(), updateData));
+                                this.get(index).emit('change', this.get(index).get());
+                                this.get(index).emit('update', this.get(index).get());
+                                this.emit('change', this.get());
+                                this.emit('update', this.get());
+                                return true;
+                            } else if (_.isPlainObject(updateData) && _.isPlainObject(this.get(index))) {
                                 this.collectionData[index] = _.extend(this.get(index), updateData);
                                 this.emit('change', this.get());
                                 this.emit('update', this.get());
@@ -259,6 +286,9 @@
                             } else {
                                 return false;
                             }
+                        } else {
+                            return false;
+                        }
                     } else if (_.isArray(index)) {
                         this.set(index);
                         this.emit('change', this.get());
@@ -271,13 +301,28 @@
             }, {
                 key: 'delete',
                 value: function _delete(index) {
-                    if (_.isNumber(index) && this.get(index)) {
-                        _.pullAt(this.collectionData, index);
-                        this.emit('change', this.get());
-                        this.emit('delete', this.get());
-                        return true;
+                    if (!_.isUndefined(index)) {
+
+                        if (_.isArray(this.get()) && this.get(index)) {
+                            _.pullAt(this.collectionData, index);
+                            this.emit('change', this.get());
+                            this.emit('delete', this.get());
+                            return true;
+                        } else if (_.isMap(this.get()) && this.get(index)) {
+                            this.collectionData.delete(index);
+                            this.emit('change', this.get());
+                            this.emit('delete', this.get());
+                            return true;
+                        } else {
+                            return false;
+                        }
                     } else if (!index) {
-                        this.set([]);
+                        //keep the same data type
+                        if (_.isMap(this.get())) {
+                            this.set(new Map());
+                        } else {
+                            this.set(new Array());
+                        }
                         this.emit('change', this.get());
                         this.emit('delete', this.get());
                         return true;

@@ -516,11 +516,12 @@ describe("A Collection array", function() {
         expect(deleteReturns).toEqual(false);
     });
     it("will remove all the model data from the collection using delete", function() {
-        let deleteReturns = modelColors.push({
+        modelColors.push({
             name: 'red'
         });
-        modelColors.delete();
-        expect(modelColors.get()).toEqual([]);
+        let deleteReturns = modelColors.delete();
+        expect(modelColors.get()).toEqual(jasmine.any(Array));
+        expect(modelColors.get().length).toEqual(0);
         expect(deleteReturns).toEqual(true);
     });
     it("will remove data in the collection using delete and emit delete event", function() {
@@ -571,7 +572,7 @@ describe("A Collection map", function() {
         modelColor3 = new Model({
             name: 'blue'
         });
-        modelColors = new CollectionTest();
+        modelColors = new Collection(new Map());
     });
     afterEach(function() {
         delete this.callback;
@@ -624,7 +625,6 @@ describe("A Collection map", function() {
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Map));
     });
     it("will save data to the end of the collection using push with a map", function() {
-        modelColors = new Collection(new Map());
         let map1 = new Map([
             ['color1', modelColor1]
         ]);
@@ -640,7 +640,6 @@ describe("A Collection map", function() {
         expect(pushReturns).toEqual(true);
     });
     it("will save data to the end of the collection using push with a single item", function() {
-        modelColors = new Collection(new Map());
         let pushReturns = modelColors.push('color1', modelColor1);
         expect(modelColors.collectionData.get('color1').modelData).toEqual({
             name: 'red'
@@ -664,7 +663,6 @@ describe("A Collection map", function() {
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Map));
     });
     it("will retrieve all the data in the collection using get", function() {
-        modelColors = new Collection(new Map());
         modelColors.push('color1', modelColor1);
         var allColorData = modelColors.get();
         expect(allColorData).toEqual(jasmine.any(Map));
@@ -674,7 +672,6 @@ describe("A Collection map", function() {
         });
     });
     it("will retrieve one model in the collection using get at the specified index", function() {
-        modelColors = new Collection(new Map());
         modelColors.push('color1', modelColor1);
         var colorData = modelColors.get('color1');
         expect(colorData).toEqual(jasmine.any(Object));
@@ -682,36 +679,45 @@ describe("A Collection map", function() {
             name: 'red'
         });
     });
-    // it("will update model data in the collection using update at the specified index", function() {
-    //     modelColors.push(modelColor1);
-    //     let updateReturns = modelColors.update(0, {
-    //         name: 'blue',
-    //         isPrimaryColor: true
-    //     });
-    //     expect(modelColors.get(0).modelData).toEqual({
-    //         name: 'blue',
-    //         isPrimaryColor: true
-    //     });
-    //     expect(updateReturns).toEqual(true);
-    // });
-    // it("will update object data in the collection using update at the specified index", function() {
-    //     modelColors.push({
-    //         foo: 'bar'
-    //     });
-    //     let updateReturns = modelColors.update(0, {
-    //         foo: 'fighters',
-    //         isBand: true
-    //     });
-    //     expect(modelColors.get(0)).toEqual({
-    //         foo: 'fighters',
-    //         isBand: true
-    //     });
-    //     expect(updateReturns).toEqual(true);
-    // });
+    it("will update model data in the collection using update at the specified index", function() {
+        modelColors.push('color1', new Model({
+            name: 'red',
+            isCMYK: false
+        }));
+        let updateReturns = modelColors.update('color1', {
+            name: 'blue',
+            isPrimaryColor: true
+        });
+        expect(modelColors.get('color1').modelData).toEqual({
+            name: 'blue',
+            isPrimaryColor: true,
+            isCMYK: false
+        });
+        expect(updateReturns).toEqual(true);
+    });
+    it("will update object data in the collection using update at the specified index", function() {
+        modelColors.push('color1', {
+            name: 'red',
+            isCMYK: false
+        });
+        let updateReturns = modelColors.update('color1', {
+            name: 'blue',
+            isPrimaryColor: true
+        });
+        expect(modelColors.get('color1')).toEqual({
+            name: 'blue',
+            isPrimaryColor: true,
+            isCMYK: false
+        });
+        expect(updateReturns).toEqual(true);
+    });
     // it("will update non object data in the collection using update at the specified index", function() {
-    //     modelColors.push(123);
-    //     let updateReturns = modelColors.update(0, 456);
-    //     expect(modelColors.get(0)).toEqual(456);
+    //     modelColors.push('color1', 'red');
+    //     console.log(modelColors);
+    //     let updateReturns = modelColors.update('color1', 'blue');
+    //     console.log(modelColors);
+    //     console.log(modelColors.get('color1'));
+    //     expect(modelColors.get('color1')).toEqual('blue');
     //     expect(updateReturns).toEqual(true);
     // });
     // it("will not update all model data in the collection when the argument is not an array at the specified index",
@@ -787,79 +793,61 @@ describe("A Collection map", function() {
     //     });
     //     expect(this.callback).toHaveBeenCalledWith(jasmine.any(Object));
     // });
-    // it("will remove model data from the the collection using delete at the specified index", function() {
-    //     modelColors.update([
-    //         new Model({
-    //             name: 'cyan'
-    //         }),
-    //         new Model({
-    //             name: 'magenta'
-    //         }),
-    //         new Model({
-    //             name: 'yellow'
-    //         }),
-    //         new Model({
-    //             name: 'black'
-    //         })
-    //     ]);
-    //     let deleteReturns = modelColors.delete(2);
-    //     expect(modelColors.get(2).modelData).toEqual({
-    //         name: 'black'
-    //     });
-    //     expect(modelColors.get().length).toEqual(3);
-    //     expect(deleteReturns).toEqual(true);
-    // });
-    // it("will not remove model data from the the collection using delete at the specified index when that index does not exist", function() {
-    //     modelColors.update([
-    //         new Model({
-    //             name: 'cyan'
-    //         }),
-    //         new Model({
-    //             name: 'magenta'
-    //         }),
-    //         new Model({
-    //             name: 'yellow'
-    //         }),
-    //         new Model({
-    //             name: 'black'
-    //         })
-    //     ]);
-    //     let deleteReturns = modelColors.delete(10);
-    //     expect(modelColors.get(2).modelData).toEqual({
-    //         name: 'yellow'
-    //     });
-    //     expect(modelColors.get().length).toEqual(4);
-    //     expect(deleteReturns).toEqual(false);
-    // });
-    // it("will remove all the model data from the collection using delete", function() {
-    //     let deleteReturns = modelColors.push({
-    //         name: 'red'
-    //     });
-    //     modelColors.delete();
-    //     expect(modelColors.get()).toEqual([]);
-    //     expect(deleteReturns).toEqual(true);
-    // });
-    // it("will remove data in the collection using delete and emit delete event", function() {
-    //     this.callback = function(data) {};
-    //     spyOn(this, 'callback');
-    //     modelColors.on('delete', this.callback);
-    //     let deleteReturns = modelColors.push({
-    //         name: 'red'
-    //     });
-    //     modelColors.delete();
-    //     expect(this.callback).toHaveBeenCalledWith(jasmine.any(Object));
-    // });
-    // it("will remove data in the collection using delete and emit change event", function() {
-    //     this.callback = function(data) {};
-    //     spyOn(this, 'callback');
-    //     modelColors.on('change', this.callback);
-    //     let deleteReturns = modelColors.push({
-    //         name: 'red'
-    //     });
-    //     modelColors.delete();
-    //     expect(this.callback).toHaveBeenCalledWith(jasmine.any(Object));
-    // });
-    // it("can be extended", function() {
-    //     expect(modelColors.extendedFunction).toEqual(jasmine.any(Function));
-    // });
+    it("will remove model data from the the collection using delete at the specified index", function() {
+        modelColors.set(new Map([
+            ['color1', modelColor1],
+            ['color2', modelColor2],
+            ['color3', modelColor3]
+        ]));
+        let deleteReturns = modelColors.delete('color2');
+        expect(modelColors.get('color2')).toEqual(undefined);
+        expect(modelColors.get().size).toEqual(2);
+        expect(deleteReturns).toEqual(true);
+    });
+    it("will not remove model data from the the collection using delete at the specified index when that index does not exist", function() {
+        modelColors.set(new Map([
+            ['color1', modelColor1],
+            ['color2', modelColor2],
+            ['color3', modelColor3]
+        ]));
+        let deleteReturns = modelColors.delete('color4');
+        expect(modelColors.get('color4')).toEqual(undefined);
+        expect(modelColors.get().size).toEqual(3);
+        expect(deleteReturns).toEqual(false);
+    });
+    it("will remove all the model data from the collection using delete", function() {
+        modelColors.set(new Map([
+            ['color1', modelColor1],
+            ['color2', modelColor2],
+            ['color3', modelColor3]
+        ]));
+        let deleteReturns = modelColors.delete();
+        expect(modelColors.get()).toEqual(jasmine.any(Map));
+        expect(modelColors.get().size).toEqual(0);
+        expect(deleteReturns).toEqual(true);
+    });
+    it("will remove data in the collection using delete and emit delete event", function() {
+        this.callback = function(data) {};
+        spyOn(this, 'callback');
+        modelColors.on('delete', this.callback);
+        modelColors.set(new Map([
+            ['color1', modelColor1],
+            ['color2', modelColor2],
+            ['color3', modelColor3]
+        ]));
+        modelColors.delete();
+        expect(this.callback).toHaveBeenCalledWith(jasmine.any(Map));
+    });
+    it("will remove data in the collection using delete and emit change event", function() {
+        this.callback = function(data) {};
+        spyOn(this, 'callback');
+        modelColors.on('change', this.callback);
+        modelColors.set(new Map([
+            ['color1', modelColor1],
+            ['color2', modelColor2],
+            ['color3', modelColor3]
+        ]));
+        modelColors.delete();
+        expect(this.callback).toHaveBeenCalledWith(jasmine.any(Map));
+    });
 });
