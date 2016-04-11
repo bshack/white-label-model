@@ -1,13 +1,13 @@
 (function (global, factory) {
     if (typeof define === "function" && define.amd) {
-        define(['module', 'events', 'lodash', 'babel-polyfill'], factory);
+        define(['module', 'events', 'lodash'], factory);
     } else if (typeof exports !== "undefined") {
-        factory(module, require('events'), require('lodash'), require('babel-polyfill'));
+        factory(module, require('events'), require('lodash'));
     } else {
         var mod = {
             exports: {}
         };
-        factory(mod, global.events, global.lodash, global.babelPolyfill);
+        factory(mod, global.events, global.lodash);
         global.index = mod.exports;
     }
 })(this, function (module, _events, _lodash) {

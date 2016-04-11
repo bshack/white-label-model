@@ -1,4 +1,3 @@
-import 'babel-polyfill';
 import EventEmitter from 'events';
 import _ from 'lodash';
 
@@ -223,7 +222,7 @@ import _ from 'lodash';
 
         // the deleter
         delete(index) {
-            
+
             if (!_.isUndefined(index)) {
 
                 if (_.isArray(this.get()) && this.get(index)) {

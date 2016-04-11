@@ -122,6 +122,10 @@ This will emit 'change' and 'delete' events.
 
 Collections can be either arrays or maps. They will default to arrays unless otherwise set. They can hold models or any other data types.
 
+To support maps you will likely need to use a polyfill in your project such as the babel-polyfill:
+
+http://babeljs.io/docs/usage/polyfill/
+
 ### Require
 
 ```
