@@ -17,17 +17,17 @@ https://nodejs.org/api/events.html
 Install the node module:
 
 ```
-npm install trndymodel --save
+npm install white-label-model --save
 ```
 
 ## Model Usage
 
-trndyModel supports models and collections, this first example is for models only.
+white-label-model supports models and collections, this first example is for models only.
 
 ### Require
 
 ```
-var Model = require('trndymodel').Model;
+var Model = require('white-label-model').Model;
 ```
 
 ### Instantiate
@@ -125,8 +125,8 @@ Collections can be either arrays or maps. They will default to arrays unless oth
 ### Require
 
 ```
-var Model = require('trndymodel').Model;
-var Collection = require('trndymodel').Collection;
+var Model = require('white-label-model').Model;
+var Collection = require('white-label-model').Collection;
 ```
 
 ### Instantiate
