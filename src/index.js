@@ -1,3 +1,4 @@
+import 'babel-polyfill';
 import EventEmitter from 'events';
 import _ from 'lodash';
 

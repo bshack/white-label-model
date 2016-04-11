@@ -2,7 +2,6 @@
 
 const WhiteLabelModel = require('../dist/index');
 const _ = require('lodash');
-require('babel-polyfill');
 
 // canary
 describe("A suite", function() {
