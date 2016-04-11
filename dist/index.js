@@ -235,6 +235,7 @@
             }, {
                 key: 'update',
                 value: function update(index, updateData) {
+
                     // if updating an item in the array or plain object
                     if (!_.isUndefined(index) && !_.isUndefined(updateData) && this.get(index)) {
 
@@ -274,12 +275,12 @@
                                 this.emit('update', this.get());
                                 return true;
                             } else if (_.isPlainObject(updateData) && _.isPlainObject(this.get(index))) {
-                                this.collectionData[index] = _.extend(this.get(index), updateData);
+                                this.collectionData.set(index, _.extend(this.get(index), updateData));
                                 this.emit('change', this.get());
                                 this.emit('update', this.get());
                                 return true;
                             } else if (updateData) {
-                                this.collectionData[index] = updateData;
+                                this.collectionData.set(index, updateData);
                                 this.emit('change', this.get());
                                 this.emit('update', this.get());
                                 return true;
@@ -289,7 +290,7 @@
                         } else {
                             return false;
                         }
-                    } else if (_.isArray(index)) {
+                    } else if (_.isArray(index) || _.isMap(index)) {
                         this.set(index);
                         this.emit('change', this.get());
                         this.emit('update', this.get());

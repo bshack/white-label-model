@@ -423,6 +423,9 @@ describe("A Collection array", function() {
                 name: 'black'
             })
         ]);
+        expect(modelColors.get(0).modelData).toEqual({
+            name: 'cyan'
+        });
         expect(modelColors.get(3).modelData).toEqual({
             name: 'black'
         });
@@ -711,88 +714,59 @@ describe("A Collection map", function() {
         });
         expect(updateReturns).toEqual(true);
     });
-    // it("will update non object data in the collection using update at the specified index", function() {
-    //     modelColors.push('color1', 'red');
-    //     console.log(modelColors);
-    //     let updateReturns = modelColors.update('color1', 'blue');
-    //     console.log(modelColors);
-    //     console.log(modelColors.get('color1'));
-    //     expect(modelColors.get('color1')).toEqual('blue');
-    //     expect(updateReturns).toEqual(true);
-    // });
-    // it("will not update all model data in the collection when the argument is not an array at the specified index",
-    //     function() {
-    //     modelColors.push(modelColor1);
-    //     let updateReturns = modelColors.update(0);
-    //     expect(modelColors.get(0).modelData).toEqual({
-    //         name: 'red'
-    //     });
-    //     expect(updateReturns).toEqual(false);
-    // });
-    // it("will update model data in the collection using update with an array of models", function() {
-    //     modelColors.push(modelColor1);
-    //     let updateReturns = modelColors.update([
-    //         new Model({
-    //             name: 'cyan'
-    //         }),
-    //         new Model({
-    //             name: 'magenta'
-    //         }),
-    //         new Model({
-    //             name: 'yellow'
-    //         }),
-    //         new Model({
-    //             name: 'black'
-    //         })
-    //     ]);
-    //     expect(modelColors.get(3).modelData).toEqual({
-    //         name: 'black'
-    //     });
-    //     expect(updateReturns).toEqual(true);
-    // });
-    // it("will not update all model data in the collection when the argument is not an array", function() {
-    //     modelColors.update([
-    //         new Model({
-    //             name: 'cyan'
-    //         }),
-    //         new Model({
-    //             name: 'magenta'
-    //         }),
-    //         new Model({
-    //             name: 'yellow'
-    //         }),
-    //         new Model({
-    //             name: 'black'
-    //         })
-    //     ]);
-    //     let updateReturns = modelColors.update({});
-    //     expect(modelColors.get(3).modelData).toEqual({
-    //         name: 'black'
-    //     });
-    //     expect(updateReturns).toEqual(false);
-    // });
-    // it("will update data in the collection using update and emit update event", function() {
-    //     this.callback = function(data) {};
-    //     spyOn(this, 'callback');
-    //     modelColors.on('update', this.callback);
-    //     modelColors.push(modelColor1);
-    //     let updateReturns = modelColors.update(0, {
-    //         name: 'blue',
-    //         isPrimaryColor: true
-    //     });
-    //     expect(this.callback).toHaveBeenCalledWith(jasmine.any(Object));
-    // });
-    // it("will update data in the collection using update and emit change event", function() {
-    //     this.callback = function(data) {};
-    //     spyOn(this, 'callback');
-    //     modelColors.on('change', this.callback);
-    //     modelColors.push(modelColor1);
-    //     let updateReturns = modelColors.update(0, {
-    //         name: 'blue',
-    //         isPrimaryColor: true
-    //     });
-    //     expect(this.callback).toHaveBeenCalledWith(jasmine.any(Object));
-    // });
+    it("will update non object data in the collection using update at the specified index", function() {
+        modelColors.push('color1', 'red');
+        let updateReturns = modelColors.update('color1', 'blue');
+        expect(modelColors.get('color1')).toEqual('blue');
+        expect(updateReturns).toEqual(true);
+    });
+    it("will not update all model data in the collection when the update data argument is empty with a specified index",
+        function() {
+        modelColors.push('color1', modelColor1);
+        let updateReturns = modelColors.update('color1');
+        expect(modelColors.get('color1').modelData).toEqual({
+            name: 'red'
+        });
+        expect(updateReturns).toEqual(false);
+    });
+    it("will update model data in the collection using update with a map of models", function() {
+        modelColors = new Collection(new Map([
+            ['color1', modelColor1],
+            ['color2', modelColor2],
+            ['color3', modelColor3]
+        ]));
+        let updateReturns = modelColors.update(new Map([
+            ['color1', modelColor3],
+            ['color2', modelColor2],
+            ['color3', modelColor1]
+        ]));
+        expect(modelColors.get('color3').modelData).toEqual({
+            name: 'red'
+        });
+        expect(updateReturns).toEqual(true);
+    });
+    it("will update data in the collection using update and emit update event", function() {
+        this.callback = function(data) {};
+        spyOn(this, 'callback');
+        modelColors.on('update', this.callback);
+        modelColors.push('color1', modelColor1);
+        let updateReturns = modelColors.update('color1', {
+            name: 'blue',
+            isPrimaryColor: true
+        });
+        expect(this.callback).toHaveBeenCalledWith(jasmine.any(Map));
+    });
+    it("will update data in the collection using update and emit change event", function() {
+        this.callback = function(data) {};
+        spyOn(this, 'callback');
+        modelColors.on('change', this.callback);
+        modelColors.push('color1', modelColor1);
+        let updateReturns = modelColors.update('color1', {
+            name: 'blue',
+            isPrimaryColor: true
+        });
+        expect(this.callback).toHaveBeenCalledWith(jasmine.any(Map));
+    });
     it("will remove model data from the the collection using delete at the specified index", function() {
         modelColors.set(new Map([
             ['color1', modelColor1],
