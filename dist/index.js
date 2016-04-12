@@ -71,9 +71,30 @@
         if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass;
     }
 
+    var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
+        return typeof obj;
+    } : function (obj) {
+        return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj;
+    };
+
     (function (EventEmitter, _) {
 
         'use strict';
+
+        var utils = {
+
+            isMap: function isMap(object) {
+                return (typeof object === 'undefined' ? 'undefined' : _typeof(object)) === 'object' && Number.isFinite(object.size);
+            },
+            extend: function extend(object1, object2) {
+                var key = void 0;
+                for (key in object2) {
+                    object1[key] = object2[key];
+                }
+                return object1;
+            }
+
+        };
 
         /*
         MODEL
@@ -88,7 +109,7 @@
                 var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(Model).call(this));
 
                 // where the data is held for the model
-                if (modelData && _.isPlainObject(modelData)) {
+                if (modelData && (typeof modelData === 'undefined' ? 'undefined' : _typeof(modelData)) === 'object') {
                     _this.set(modelData);
                 } else {
                     _this.set(new Object());
@@ -107,7 +128,7 @@
                 key: 'message',
                 value: function message(messages, data) {
 
-                    if (_.isArray(messages), data) {
+                    if (Array.isArray(messages), data) {
 
                         var i = void 0;
                         for (i = 0; i < messages.length; i++) {
@@ -138,7 +159,7 @@
             }, {
                 key: 'set',
                 value: function set(data) {
-                    if (data && _.isPlainObject(data)) {
+                    if (data && (typeof data === 'undefined' ? 'undefined' : _typeof(data)) === 'object') {
                         this.modelData = data;
                         this.message(['change', 'set'], this.get());
                         return true;
@@ -155,8 +176,8 @@
                 key: 'update',
                 value: function update(updateData) {
 
-                    if (updateData && _.isPlainObject(updateData)) {
-                        this.set(_.extend(this.get(), updateData));
+                    if (updateData && (typeof updateData === 'undefined' ? 'undefined' : _typeof(updateData)) === 'object') {
+                        this.set(utils.extend(this.get(), updateData));
                         this.message(['change', 'update'], this.get());
                         return true;
                     } else {
@@ -188,7 +209,7 @@
                 var _this2 = _possibleConstructorReturn(this, Object.getPrototypeOf(Collection).call(this));
 
                 // where the data is held for the collection
-                if (collectionData && (_.isArray(collectionData) || _.isMap(collectionData))) {
+                if (collectionData && (Array.isArray(collectionData) || utils.isMap(collectionData))) {
                     _this2.set(collectionData);
                 } else {
                     _this2.set(new Array());
@@ -207,7 +228,7 @@
                 key: 'message',
                 value: function message(messages, data) {
 
-                    if (_.isArray(messages), data) {
+                    if (Array.isArray(messages), data) {
 
                         var i = void 0;
                         for (i = 0; i < messages.length; i++) {
@@ -239,7 +260,7 @@
                 key: 'set',
                 value: function set(data) {
 
-                    if (_.isArray(data) || _.isMap(data)) {
+                    if (Array.isArray(data) || utils.isMap(data)) {
                         this.collectionData = data;
                         this.message(['change', 'set'], this.get());
                         return true;
@@ -264,7 +285,7 @@
                         data = key;
                     }
 
-                    if (_.isMap(data)) {
+                    if (utils.isMap(data)) {
                         data.forEach(function (value, key) {
                             savedData.set(key, value);
                         });
@@ -282,9 +303,9 @@
             }, {
                 key: 'get',
                 value: function get(index) {
-                    if (index && _.isMap(this.collectionData)) {
+                    if (index && utils.isMap(this.collectionData)) {
                         return this.collectionData.get(index);
-                    } else if (_.isNumber(index)) {
+                    } else if (Number.isFinite(index)) {
                         return this.collectionData[index];
                     } else {
                         return this.collectionData;
@@ -294,22 +315,22 @@
                 key: 'update',
                 value: function update(index, updateData) {
 
-                    // if updating an item in the array or plain object
-                    if (!_.isUndefined(index) && !_.isUndefined(updateData) && this.get(index) && (_.isArray(this.get()) || _.isMap(this.get()))) {
+                    // if updating an item in the array or object
+                    if (index !== undefined && updateData !== undefined && this.get(index) && (Array.isArray(this.get()) || utils.isMap(this.get()))) {
 
                         // if we are updating a model
-                        if (_.isPlainObject(updateData) && this.get(index).get && _.isPlainObject(this.get(index).get())) {
-                            this.get(index).set(_.extend(this.get(index).get(), updateData));
+                        if ((typeof updateData === 'undefined' ? 'undefined' : _typeof(updateData)) === 'object' && this.get(index).get && _typeof(this.get(index).get()) === 'object') {
+                            this.get(index).set(utils.extend(this.get(index).get(), updateData));
                             this.get(index).message(['change', 'update'], this.get(index).get());
                             this.message(['change', 'update'], this.get());
                             return true;
                             // if we are updating a standard object
-                        } else if (_.isPlainObject(updateData) && _.isPlainObject(this.get(index))) {
-                                this.collectionData[index] = _.extend(this.get(index), updateData);
+                        } else if ((typeof updateData === 'undefined' ? 'undefined' : _typeof(updateData)) === 'object' && _typeof(this.get(index)) === 'object') {
+                                this.collectionData[index] = utils.extend(this.get(index), updateData);
                                 this.message(['change', 'update'], this.get());
                                 return true;
                             } else if (updateData) {
-                                if (_.isMap(this.collectionData)) {
+                                if (utils.isMap(this.collectionData)) {
                                     this.collectionData.set(index, updateData);
                                 } else {
                                     this.collectionData[index] = updateData;
@@ -317,7 +338,7 @@
                                 this.message(['change', 'update'], this.get());
                                 return true;
                             }
-                    } else if (_.isArray(index) || _.isMap(index)) {
+                    } else if (Array.isArray(index) || utils.isMap(index)) {
                         this.set(index);
                         this.message(['change', 'update'], this.get());
                         return true;
@@ -329,13 +350,13 @@
                 key: 'delete',
                 value: function _delete(index) {
 
-                    if (!_.isUndefined(index)) {
+                    if (index !== undefined) {
 
-                        if (_.isArray(this.get()) && this.get(index)) {
+                        if (Array.isArray(this.get()) && this.get(index)) {
                             _.pullAt(this.collectionData, index);
                             this.message(['change', 'delete'], this.get());
                             return true;
-                        } else if (_.isMap(this.get()) && this.get(index)) {
+                        } else if (utils.isMap(this.get()) && this.get(index)) {
                             this.collectionData.delete(index);
                             this.message(['change', 'delete'], this.get());
                             return true;
@@ -344,7 +365,7 @@
                         }
                     } else {
                         //keep the same data type
-                        if (_.isMap(this.get())) {
+                        if (utils.isMap(this.get())) {
                             this.set(new Map());
                         } else {
                             this.set(new Array());
