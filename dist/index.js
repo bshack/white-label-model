@@ -83,9 +83,28 @@
 
         var utils = {
 
+            /*
+            UTILS
+            */
+
             isMap: function isMap(object) {
                 return (typeof object === 'undefined' ? 'undefined' : _typeof(object)) === 'object' && Number.isFinite(object.size);
             },
+            isPlainObject: function isPlainObject(object) {
+                return (typeof object === 'undefined' ? 'undefined' : _typeof(object)) === 'object' && !Number.isFinite(object.size) && !Array.isArray(object);
+            },
+            pullAt: function pullAt(data, index) {
+                var i = void 0;
+                var newData = new Array();
+                for (i = 0; i < data.length; i++) {
+                    if (i === index) {
+                        continue;
+                    }
+                    newData.push(data[i]);
+                }
+                return newData;
+            },
+
             extend: function extend(object1, object2) {
                 var key = void 0;
                 for (key in object2) {
@@ -109,7 +128,7 @@
                 var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(Model).call(this));
 
                 // where the data is held for the model
-                if (modelData && (typeof modelData === 'undefined' ? 'undefined' : _typeof(modelData)) === 'object') {
+                if (modelData && utils.isPlainObject(modelData)) {
                     _this.set(modelData);
                 } else {
                     _this.set(new Object());
@@ -159,7 +178,7 @@
             }, {
                 key: 'set',
                 value: function set(data) {
-                    if (data && (typeof data === 'undefined' ? 'undefined' : _typeof(data)) === 'object') {
+                    if (data && utils.isPlainObject(data)) {
                         this.modelData = data;
                         this.message(['change', 'set'], this.get());
                         return true;
@@ -176,7 +195,7 @@
                 key: 'update',
                 value: function update(updateData) {
 
-                    if (updateData && (typeof updateData === 'undefined' ? 'undefined' : _typeof(updateData)) === 'object') {
+                    if (updateData && utils.isPlainObject(updateData)) {
                         this.set(utils.extend(this.get(), updateData));
                         this.message(['change', 'update'], this.get());
                         return true;
@@ -319,13 +338,13 @@
                     if (index !== undefined && updateData !== undefined && this.get(index) && (Array.isArray(this.get()) || utils.isMap(this.get()))) {
 
                         // if we are updating a model
-                        if ((typeof updateData === 'undefined' ? 'undefined' : _typeof(updateData)) === 'object' && this.get(index).get && _typeof(this.get(index).get()) === 'object') {
+                        if (utils.isPlainObject(updateData) && this.get(index).get && utils.isPlainObject(this.get(index).get())) {
                             this.get(index).set(utils.extend(this.get(index).get(), updateData));
                             this.get(index).message(['change', 'update'], this.get(index).get());
                             this.message(['change', 'update'], this.get());
                             return true;
                             // if we are updating a standard object
-                        } else if ((typeof updateData === 'undefined' ? 'undefined' : _typeof(updateData)) === 'object' && _typeof(this.get(index)) === 'object') {
+                        } else if (utils.isPlainObject(updateData) && utils.isPlainObject(this.get(index))) {
                                 this.collectionData[index] = utils.extend(this.get(index), updateData);
                                 this.message(['change', 'update'], this.get());
                                 return true;
@@ -353,7 +372,7 @@
                     if (index !== undefined) {
 
                         if (Array.isArray(this.get()) && this.get(index)) {
-                            _.pullAt(this.collectionData, index);
+                            this.set(utils.pullAt(this.collectionData, index));
                             this.message(['change', 'delete'], this.get());
                             return true;
                         } else if (utils.isMap(this.get()) && this.get(index)) {
