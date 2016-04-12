@@ -3,12 +3,20 @@
 const WhiteLabelModel = require('../dist/index');
 const _ = require('lodash');
 
+
+
+
+
 // canary
 describe("A suite", function() {
     it("contains spec with an expectation", function() {
         expect(true).toBe(true);
     });
 });
+
+
+
+
 
 describe("WhiteLabelModel module", function() {
     const Model = WhiteLabelModel.Model;
@@ -20,6 +28,10 @@ describe("WhiteLabelModel module", function() {
         expect(WhiteLabelModel.Collection).toEqual(jasmine.any(Function));
     });
 });
+
+
+
+
 
 describe("A Model", function() {
     const Model = WhiteLabelModel.Model;
@@ -65,6 +77,12 @@ describe("A Model", function() {
     });
     it("is has an delete function", function() {
         expect(modelColor.delete).toEqual(jasmine.any(Function));
+    });
+    it("is does not have a mediator setup", function() {
+        expect(modelColor.mediator).toEqual(false);
+    });
+    it("is does not have a name defined", function() {
+        expect(modelColor.name).toEqual(false);
     });
     it("calls initialize function", function() {
         modelColor.initialize();
@@ -179,7 +197,93 @@ describe("A Model", function() {
     it("can be extended", function() {
         expect(modelColor.extendedFunction).toEqual(jasmine.any(Function));
     });
+    it("will save data in the model using set and emit set event with mediator", function() {
+        //fake mediator
+        let mediator = new function() {
+            this.emit = function(message, data) {}
+        };
+        spyOn(mediator, 'emit');
+        const MediatorModelTest = class extends Model {
+            constructor() {
+                super();
+                // optionally add in a mediator when extended
+                this.mediator = mediator;
+                // name for this model instance be used in mediator emit. Required on when using a mediator
+                this.name = 'test-mediator-1';
+            }
+        };
+        const mediatorModelTest = new MediatorModelTest();
+        mediatorModelTest.set({
+            name: 'red'
+        });
+        expect(mediator.emit).toHaveBeenCalledWith('model:test-mediator-1:set', {
+            name: 'red'
+        });
+        expect(mediator.emit).toHaveBeenCalledWith('model:test-mediator-1:change', {
+            name: 'red'
+        });
+    });
+    it("will update data in the model using update and emit change event with mediator", function() {
+        //fake mediator
+        let mediator = new function() {
+            this.emit = function(message, data) {}
+        };
+        spyOn(mediator, 'emit');
+        const MediatorModelTest = class extends Model {
+            constructor() {
+                super();
+                // optionally add in a mediator when extended
+                this.mediator = mediator;
+                // name for this model instance be used in mediator emit. Required on when using a mediator
+                this.name = 'test-mediator-1';
+            }
+        };
+        const mediatorModelTest = new MediatorModelTest();
+        mediatorModelTest.set({
+            name: 'red'
+        });
+        mediatorModelTest.update({
+            name: 'blue',
+            isPrimaryColor: true
+        });
+        expect(mediator.emit).toHaveBeenCalledWith('model:test-mediator-1:update', {
+            name: 'blue',
+            isPrimaryColor: true
+        });
+        expect(mediator.emit).toHaveBeenCalledWith('model:test-mediator-1:change', {
+            name: 'blue',
+            isPrimaryColor: true
+        });
+    });
+    it("will remove data in the model using delete and emit delete event with mediator", function() {
+        //fake mediator
+        let mediator = new function() {
+            this.emit = function(message, data) {}
+        };
+        spyOn(mediator, 'emit');
+        const MediatorModelTest = class extends Model {
+            constructor() {
+                super();
+                // optionally add in a mediator when extended
+                this.mediator = mediator;
+                // name for this model instance be used in mediator emit. Required on when using a mediator
+                this.name = 'test-mediator-1';
+            }
+        };
+        const mediatorModelTest = new MediatorModelTest();
+        mediatorModelTest.set({
+            name: 'red'
+        });
+        mediatorModelTest.delete();
+        expect(mediator.emit).toHaveBeenCalledWith('model:test-mediator-1:delete', {});
+        expect(mediator.emit).toHaveBeenCalledWith('model:test-mediator-1:change', {});
+    });
 });
+
+
+
+
+
 
 describe("A Collection array", function() {
     this.callback = function(data) {};
@@ -242,6 +346,12 @@ describe("A Collection array", function() {
     });
     it("is has an delete function", function() {
         expect(modelColors.delete).toEqual(jasmine.any(Function));
+    });
+    it("is does not have a mediator setup", function() {
+        expect(modelColors.mediator).toEqual(false);
+    });
+    it("is does not have a name defined", function() {
+        expect(modelColors.name).toEqual(false);
     });
     it("calls initialize function", function() {
         modelColors.initialize();
@@ -546,10 +656,122 @@ describe("A Collection array", function() {
         modelColors.delete();
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Array));
     });
+
+
+    it("will add data to the model using push and emit push event with the mediator", function() {
+        //fake mediator
+        let mediator = new function() {
+            this.emit = function(message, data) {}
+        };
+        spyOn(mediator, 'emit');
+        const MediatorCollectionTest = class extends Collection {
+            constructor() {
+                super();
+                // optionally add in a mediator when extended
+                this.mediator = mediator;
+                // name for this model instance be used in mediator emit. Required on when using a mediator
+                this.name = 'test-mediator-1';
+            }
+        };
+        const mediatorCollectionTest = new MediatorCollectionTest();
+        mediatorCollectionTest.push(modelColor1);
+        expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:push', jasmine.any(Array));
+        expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:change', jasmine.any(Array));
+    });
+    it("will set data in the model using set and emit set event with the mediator", function() {
+        //fake mediator
+        let mediator = new function() {
+            this.emit = function(message, data) {}
+        };
+        spyOn(mediator, 'emit');
+        const MediatorCollectionTest = class extends Collection {
+            constructor() {
+                super();
+                // optionally add in a mediator when extended
+                this.mediator = mediator;
+                // name for this model instance be used in mediator emit. Required on when using a mediator
+                this.name = 'test-mediator-1';
+            }
+        };
+        const mediatorCollectionTest = new MediatorCollectionTest();
+        mediatorCollectionTest.set([modelColor1]);
+        expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:set', jasmine.any(Array));
+        expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:change', jasmine.any(Array));
+    });
+    it("will update data in the model using update and emit delete event with the mediator", function() {
+        //fake mediator
+        let mediator = new function() {
+            this.emit = function(message, data) {}
+        };
+        spyOn(mediator, 'emit');
+        const MediatorCollectionTest = class extends Collection {
+            constructor() {
+                super();
+                // optionally add in a mediator when extended
+                this.mediator = mediator;
+                // name for this model instance be used in mediator emit. Required on when using a mediator
+                this.name = 'test-mediator-1';
+            }
+        };
+        const mediatorCollectionTest = new MediatorCollectionTest();
+        mediatorCollectionTest.push(modelColor1);
+        mediatorCollectionTest.update(0, {
+            color: 'brown'
+        });
+        expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:update', jasmine.any(Array));
+        expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:change', jasmine.any(Array));
+    });
+    it("will remove data in the model using delete and emit delete event with the mediator", function() {
+        //fake mediator
+        let mediator = new function() {
+            this.emit = function(message, data) {}
+        };
+        spyOn(mediator, 'emit');
+        const MediatorCollectionTest = class extends Collection {
+            constructor() {
+                super();
+                // optionally add in a mediator when extended
+                this.mediator = mediator;
+                // name for this model instance be used in mediator emit. Required on when using a mediator
+                this.name = 'test-mediator-1';
+            }
+        };
+        const mediatorCollectionTest = new MediatorCollectionTest();
+        mediatorCollectionTest.push(modelColor1);
+        mediatorCollectionTest.delete();
+        expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:delete', jasmine.any(Array));
+        expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:change', jasmine.any(Array));
+    });
+    it("will remove data in the model using delete and not emit delete event with the mediator", function() {
+        //fake mediator
+        let mediator = new function() {
+            this.emit = function(message, data) {}
+        };
+        spyOn(mediator, 'emit');
+        const MediatorCollectionTest = class extends Collection {
+            constructor() {
+                super();
+                // optionally add in a mediator when extended
+                this.mediator = mediator;
+                // name for this model instance be used in mediator emit. Required on when using a mediator
+                this.name = 'test-mediator-1';
+            }
+        };
+        const mediatorCollectionTest = new MediatorCollectionTest();
+        mediatorCollectionTest.push(modelColor1);
+        mediatorCollectionTest.delete();
+        expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:delete', jasmine.any(Array));
+        expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:change', jasmine.any(Array));
+    });
     it("can be extended", function() {
         expect(modelColors.extendedFunction).toEqual(jasmine.any(Function));
     });
 });
+
+
+
+
+
 
 describe("A Collection map", function() {
     this.callback = function(data) {};

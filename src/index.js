@@ -22,18 +22,53 @@ import _ from 'lodash';
                 this.set(new Object());
             }
 
+            // optionally add in a mediator when extended
+            this.mediator = false;
+
+            // name for this model instance be used in mediator emit. Required on when using a mediator
+            this.name = false;
+
+        }
+
+        message(messages, data) {
+
+            if (_.isArray(messages), data) {
+
+                let i;
+                for (i = 0; i < messages.length; i++) {
+                    this.emit(messages[i], data);
+                    if (this.name && this.mediator && this.mediator.emit) {
+                        this.mediator.emit('model:' + this.name + ':' + messages[i], data);
+                    }
+                }
+
+                return true;
+
+            } else {
+
+                return false;
+
+            }
+
         }
 
         initialize() {
+
             return this;
+
+        }
+
+        destroy() {
+
+            return this;
+
         }
 
         // the setter
         set(data) {
             if (data && _.isPlainObject(data)) {
                 this.modelData = data;
-                this.emit('change', this.get());
-                this.emit('set', this.get());
+                this.message(['change', 'set'], this.get());
                 return true;
             } else {
                 return false;
@@ -50,8 +85,7 @@ import _ from 'lodash';
 
             if (updateData && _.isPlainObject(updateData)) {
                 this.set(_.extend(this.get(), updateData));
-                this.emit('change', this.get());
-                this.emit('update', this.get());
+                this.message(['change', 'update'], this.get());
                 return true;
             } else {
                 return false;
@@ -62,8 +96,7 @@ import _ from 'lodash';
         // the deleter
         delete() {
             this.set({});
-            this.emit('change', this.get());
-            this.emit('delete', this.get());
+            this.message(['change', 'delete'], this.get());
             return true;
         };
 
@@ -86,9 +119,43 @@ import _ from 'lodash';
                 this.set(new Array());
             }
 
+            // optionally add in a mediator when extended
+            this.mediator = false;
+
+            // name for this model instance be used in mediator emit. Required on when using a mediator
+            this.name = false;
+
+        }
+
+        message(messages, data) {
+
+            if (_.isArray(messages), data) {
+
+                let i;
+                for (i = 0; i < messages.length; i++) {
+                    this.emit(messages[i], data);
+                    if (this.name && this.mediator && this.mediator.emit) {
+                        this.mediator.emit('collection:' + this.name + ':' + messages[i], data);
+                    }
+                }
+
+                return true;
+
+            } else {
+
+                return false;
+
+            }
+
         }
 
         initialize() {
+
+            return this;
+
+        }
+
+        destroy() {
 
             return this;
 
@@ -99,8 +166,7 @@ import _ from 'lodash';
 
             if (_.isArray(data) || _.isMap(data)) {
                 this.collectionData = data;
-                this.emit('change', this.get());
-                this.emit('set', this.get());
+                this.message(['change', 'set'], this.get());
                 return true;
             } else {
                 return false;
@@ -118,8 +184,7 @@ import _ from 'lodash';
             if (key && data) {
                 savedData.set(key, data);
                 this.set(savedData);
-                this.emit('change', this.get());
-                this.emit('push', this.get());
+                this.message(['change', 'push'], this.get());
                 return true;
             } else {
                 data = key;
@@ -130,13 +195,11 @@ import _ from 'lodash';
                     savedData.set(key, value);
                 });
                 this.set(savedData);
-                this.emit('change', this.get());
-                this.emit('push', this.get());
+                this.message(['change', 'push'], this.get());
                 return true;
             } else if (data) {
                 this.set(_.concat(savedData, data));
-                this.emit('change', this.get());
-                this.emit('push', this.get());
+                this.message(['change', 'push'], this.get());
                 return true;
             } else {
                 return false;
@@ -159,60 +222,36 @@ import _ from 'lodash';
         update(index, updateData) {
 
             // if updating an item in the array or plain object
-            if (!_.isUndefined(index) && !_.isUndefined(updateData) && this.get(index)) {
+            if (!_.isUndefined(index)
+                && !_.isUndefined(updateData)
+                && this.get(index)
+                && (_.isArray(this.get()) || _.isMap(this.get())))
+            {
 
-                // if the collection is an array
-                if (_.isNumber(index) && _.isArray(this.get())) {
-
-                    // if we are updating a model
-                    if (_.isPlainObject(updateData) && this.get(index).get && _.isPlainObject(this.get(index).get())) {
-                        this.get(index).set(_.extend(this.get(index).get(), updateData));
-                        this.get(index).emit('change', this.get(index).get());
-                        this.get(index).emit('update', this.get(index).get());
-                        this.emit('change', this.get());
-                        this.emit('update', this.get());
-                        return true;
-                    // if we are updating a standard object
-                    } else if (_.isPlainObject(updateData) && _.isPlainObject(this.get(index))) {
-                        this.collectionData[index] = _.extend(this.get(index), updateData);
-                        this.emit('change', this.get());
-                        this.emit('update', this.get());
-                        return true;
-                    } else if (updateData) {
-                        this.collectionData[index] = updateData;
-                        this.emit('change', this.get());
-                        this.emit('update', this.get());
-                        return true;
-                    }
-
-                } else if (_.isMap(this.get())) {
-
-                    // if we are updating a model
-                    if (_.isPlainObject(updateData) && this.get(index).get && _.isPlainObject(this.get(index).get())) {
-                        this.get(index).set(_.extend(this.get(index).get(), updateData));
-                        this.get(index).emit('change', this.get(index).get());
-                        this.get(index).emit('update', this.get(index).get());
-                        this.emit('change', this.get());
-                        this.emit('update', this.get());
-                        return true;
-                    } else if (_.isPlainObject(updateData) && _.isPlainObject(this.get(index))) {
-                        this.collectionData.set(index, _.extend(this.get(index), updateData));
-                        this.emit('change', this.get());
-                        this.emit('update', this.get());
-                        return true;
-                    } else if (updateData) {
+                // if we are updating a model
+                if (_.isPlainObject(updateData) && this.get(index).get && _.isPlainObject(this.get(index).get())) {
+                    this.get(index).set(_.extend(this.get(index).get(), updateData));
+                    this.get(index).message(['change', 'update'], this.get(index).get());
+                    this.message(['change', 'update'], this.get());
+                    return true;
+                // if we are updating a standard object
+                } else if (_.isPlainObject(updateData) && _.isPlainObject(this.get(index))) {
+                    this.collectionData[index] = _.extend(this.get(index), updateData);
+                    this.message(['change', 'update'], this.get());
+                    return true;
+                } else if (updateData) {
+                    if (_.isMap(this.collectionData)) {
                         this.collectionData.set(index, updateData);
-                        this.emit('change', this.get());
-                        this.emit('update', this.get());
-                        return true;
+                    } else {
+                        this.collectionData[index] = updateData;
                     }
-
+                    this.message(['change', 'update'], this.get());
+                    return true;
                 }
 
             } else if (_.isArray(index) || _.isMap(index)) {
                 this.set(index);
-                this.emit('change', this.get());
-                this.emit('update', this.get());
+                this.message(['change', 'update'], this.get());
                 return true;
             } else {
                 return false;
@@ -227,27 +266,24 @@ import _ from 'lodash';
 
                 if (_.isArray(this.get()) && this.get(index)) {
                     _.pullAt(this.collectionData, index);
-                    this.emit('change', this.get());
-                    this.emit('delete', this.get());
+                    this.message(['change', 'delete'], this.get());
                     return true;
                 } else if (_.isMap(this.get()) && this.get(index)) {
                     this.collectionData.delete(index);
-                    this.emit('change', this.get());
-                    this.emit('delete', this.get());
+                    this.message(['change', 'delete'], this.get());
                     return true;
                 } else {
                     return false;
                 }
 
-            } else if (!index) {
+            } else {
                 //keep the same data type
                 if (_.isMap(this.get())) {
                     this.set(new Map());
                 } else {
                     this.set(new Array());
                 }
-                this.emit('change', this.get());
-                this.emit('delete', this.get());
+                this.message(['change', 'delete'], this.get());
                 return true;
             }
 
