@@ -1,22 +1,23 @@
 import EventEmitter from 'events';
-import _ from 'lodash';
 
-((EventEmitter, _) => {
+((EventEmitter) => {
 
     'use strict';
 
-    const utils = {
+    /*
+    UTILITIES
+    */
 
-        /*
-        UTILS
-        */
+    const Utilities = class {
 
-        isMap: function(object) {
+        isMap(object) {
             return (typeof object === 'object' && Number.isFinite(object.size))
-        },
-        isPlainObject: function(object) {
+        }
+
+        isPlainObject(object) {
             return (typeof object === 'object' && !Number.isFinite(object.size)  && !Array.isArray(object))
-        },
+        }
+
         pullAt(data, index) {
             let i;
             let newData = new Array();
@@ -27,8 +28,21 @@ import _ from 'lodash';
                 newData.push(data[i]);
             }
             return newData;
-        },
-        extend: function(object1, object2) {
+        }
+
+        concat(data, value) {
+            if (Array.isArray(value)) {
+                let i;
+                for (i = 0; i < value.length; i++) {
+                    data.push(value[i]);
+                }
+            } else {
+                data.push(value);
+            }
+            return data;
+        }
+
+        extend(object1, object2) {
             let key;
             for (key in object2) {
                 object1[key] = object2[key];
@@ -36,7 +50,9 @@ import _ from 'lodash';
             return object1;
         }
 
-    };
+    }
+
+    const utilities = new Utilities();
 
     /*
     MODEL
@@ -49,7 +65,7 @@ import _ from 'lodash';
             super();
 
             // where the data is held for the model
-            if (modelData && utils.isPlainObject(modelData)) {
+            if (modelData && utilities.isPlainObject(modelData)) {
                 this.set(modelData);
             } else {
                 this.set(new Object());
@@ -99,7 +115,7 @@ import _ from 'lodash';
 
         // the setter
         set(data) {
-            if (data && utils.isPlainObject(data)) {
+            if (data && utilities.isPlainObject(data)) {
                 this.modelData = data;
                 this.message(['change', 'set'], this.get());
                 return true;
@@ -116,8 +132,8 @@ import _ from 'lodash';
         // the updater
         update(updateData) {
 
-            if (updateData && utils.isPlainObject(updateData)) {
-                this.set(utils.extend(this.get(), updateData));
+            if (updateData && utilities.isPlainObject(updateData)) {
+                this.set(utilities.extend(this.get(), updateData));
                 this.message(['change', 'update'], this.get());
                 return true;
             } else {
@@ -146,7 +162,7 @@ import _ from 'lodash';
             super();
 
             // where the data is held for the collection
-            if (collectionData && (Array.isArray(collectionData) || utils.isMap(collectionData))) {
+            if (collectionData && (Array.isArray(collectionData) || utilities.isMap(collectionData))) {
                 this.set(collectionData);
             } else {
                 this.set(new Array());
@@ -197,7 +213,7 @@ import _ from 'lodash';
         // the setter
         set(data) {
 
-            if (Array.isArray(data) || utils.isMap(data)) {
+            if (Array.isArray(data) || utilities.isMap(data)) {
                 this.collectionData = data;
                 this.message(['change', 'set'], this.get());
                 return true;
@@ -223,7 +239,7 @@ import _ from 'lodash';
                 data = key;
             }
 
-            if (utils.isMap(data)) {
+            if (utilities.isMap(data)) {
                 data.forEach(function(value, key) {
                     savedData.set(key, value);
                 });
@@ -231,7 +247,7 @@ import _ from 'lodash';
                 this.message(['change', 'push'], this.get());
                 return true;
             } else if (data) {
-                this.set(_.concat(savedData, data));
+                this.set(utilities.concat(savedData, data));
                 this.message(['change', 'push'], this.get());
                 return true;
             } else {
@@ -242,7 +258,7 @@ import _ from 'lodash';
 
         // the getter
         get(index) {
-            if (index && utils.isMap(this.collectionData)) {
+            if (index && utilities.isMap(this.collectionData)) {
                 return this.collectionData.get(index);
             } else if (Number.isFinite(index)) {
                 return this.collectionData[index];
@@ -258,25 +274,25 @@ import _ from 'lodash';
             if (index !== undefined
                 && updateData !== undefined
                 && this.get(index)
-                && (Array.isArray(this.get()) || utils.isMap(this.get())))
+                && (Array.isArray(this.get()) || utilities.isMap(this.get())))
             {
 
                 // if we are updating a model
-                if (utils.isPlainObject(updateData)
+                if (utilities.isPlainObject(updateData)
                     && this.get(index).get
-                    && utils.isPlainObject(this.get(index).get())
+                    && utilities.isPlainObject(this.get(index).get())
                 ) {
-                    this.get(index).set(utils.extend(this.get(index).get(), updateData));
+                    this.get(index).set(utilities.extend(this.get(index).get(), updateData));
                     this.get(index).message(['change', 'update'], this.get(index).get());
                     this.message(['change', 'update'], this.get());
                     return true;
                 // if we are updating a standard object
-            } else if (utils.isPlainObject(updateData) && utils.isPlainObject(this.get(index))) {
-                    this.collectionData[index] = utils.extend(this.get(index), updateData);
+            } else if (utilities.isPlainObject(updateData) && utilities.isPlainObject(this.get(index))) {
+                    this.collectionData[index] = utilities.extend(this.get(index), updateData);
                     this.message(['change', 'update'], this.get());
                     return true;
                 } else if (updateData) {
-                    if (utils.isMap(this.collectionData)) {
+                    if (utilities.isMap(this.collectionData)) {
                         this.collectionData.set(index, updateData);
                     } else {
                         this.collectionData[index] = updateData;
@@ -285,7 +301,7 @@ import _ from 'lodash';
                     return true;
                 }
 
-            } else if (Array.isArray(index) || utils.isMap(index)) {
+            } else if (Array.isArray(index) || utilities.isMap(index)) {
                 this.set(index);
                 this.message(['change', 'update'], this.get());
                 return true;
@@ -301,10 +317,10 @@ import _ from 'lodash';
             if (index !== undefined) {
 
                 if (Array.isArray(this.get()) && this.get(index)) {
-                    this.set(utils.pullAt(this.collectionData, index));
+                    this.set(utilities.pullAt(this.collectionData, index));
                     this.message(['change', 'delete'], this.get());
                     return true;
-                } else if (utils.isMap(this.get()) && this.get(index)) {
+                } else if (utilities.isMap(this.get()) && this.get(index)) {
                     this.collectionData.delete(index);
                     this.message(['change', 'delete'], this.get());
                     return true;
@@ -314,7 +330,7 @@ import _ from 'lodash';
 
             } else {
                 //keep the same data type
-                if (utils.isMap(this.get())) {
+                if (utilities.isMap(this.get())) {
                     this.set(new Map());
                 } else {
                     this.set(new Array());
@@ -332,4 +348,4 @@ import _ from 'lodash';
         Collection: Collection
     };
 
-})(EventEmitter, _);
+})(EventEmitter);

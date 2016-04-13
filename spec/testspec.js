@@ -1,11 +1,6 @@
 'use strict';
 
 const WhiteLabelModel = require('../dist/index');
-const _ = require('lodash');
-
-
-
-
 
 // canary
 describe("A suite", function() {

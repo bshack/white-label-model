@@ -1,51 +1,25 @@
 (function (global, factory) {
     if (typeof define === "function" && define.amd) {
-        define(['module', 'events', 'lodash'], factory);
+        define(['module', 'events'], factory);
     } else if (typeof exports !== "undefined") {
-        factory(module, require('events'), require('lodash'));
+        factory(module, require('events'));
     } else {
         var mod = {
             exports: {}
         };
-        factory(mod, global.events, global.lodash);
+        factory(mod, global.events);
         global.index = mod.exports;
     }
-})(this, function (module, _events, _lodash) {
+})(this, function (module, _events) {
     'use strict';
 
     var _events2 = _interopRequireDefault(_events);
-
-    var _lodash2 = _interopRequireDefault(_lodash);
 
     function _interopRequireDefault(obj) {
         return obj && obj.__esModule ? obj : {
             default: obj
         };
     }
-
-    function _classCallCheck(instance, Constructor) {
-        if (!(instance instanceof Constructor)) {
-            throw new TypeError("Cannot call a class as a function");
-        }
-    }
-
-    var _createClass = function () {
-        function defineProperties(target, props) {
-            for (var i = 0; i < props.length; i++) {
-                var descriptor = props[i];
-                descriptor.enumerable = descriptor.enumerable || false;
-                descriptor.configurable = true;
-                if ("value" in descriptor) descriptor.writable = true;
-                Object.defineProperty(target, descriptor.key, descriptor);
-            }
-        }
-
-        return function (Constructor, protoProps, staticProps) {
-            if (protoProps) defineProperties(Constructor.prototype, protoProps);
-            if (staticProps) defineProperties(Constructor, staticProps);
-            return Constructor;
-        };
-    }();
 
     function _possibleConstructorReturn(self, call) {
         if (!self) {
@@ -77,43 +51,94 @@
         return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj;
     };
 
-    (function (EventEmitter, _) {
+    function _classCallCheck(instance, Constructor) {
+        if (!(instance instanceof Constructor)) {
+            throw new TypeError("Cannot call a class as a function");
+        }
+    }
+
+    var _createClass = function () {
+        function defineProperties(target, props) {
+            for (var i = 0; i < props.length; i++) {
+                var descriptor = props[i];
+                descriptor.enumerable = descriptor.enumerable || false;
+                descriptor.configurable = true;
+                if ("value" in descriptor) descriptor.writable = true;
+                Object.defineProperty(target, descriptor.key, descriptor);
+            }
+        }
+
+        return function (Constructor, protoProps, staticProps) {
+            if (protoProps) defineProperties(Constructor.prototype, protoProps);
+            if (staticProps) defineProperties(Constructor, staticProps);
+            return Constructor;
+        };
+    }();
+
+    (function (EventEmitter) {
 
         'use strict';
 
-        var utils = {
+        /*
+        UTILITIES
+        */
 
-            /*
-            UTILS
-            */
-
-            isMap: function isMap(object) {
-                return (typeof object === 'undefined' ? 'undefined' : _typeof(object)) === 'object' && Number.isFinite(object.size);
-            },
-            isPlainObject: function isPlainObject(object) {
-                return (typeof object === 'undefined' ? 'undefined' : _typeof(object)) === 'object' && !Number.isFinite(object.size) && !Array.isArray(object);
-            },
-            pullAt: function pullAt(data, index) {
-                var i = void 0;
-                var newData = new Array();
-                for (i = 0; i < data.length; i++) {
-                    if (i === index) {
-                        continue;
-                    }
-                    newData.push(data[i]);
-                }
-                return newData;
-            },
-
-            extend: function extend(object1, object2) {
-                var key = void 0;
-                for (key in object2) {
-                    object1[key] = object2[key];
-                }
-                return object1;
+        var Utilities = function () {
+            function Utilities() {
+                _classCallCheck(this, Utilities);
             }
 
-        };
+            _createClass(Utilities, [{
+                key: 'isMap',
+                value: function isMap(object) {
+                    return (typeof object === 'undefined' ? 'undefined' : _typeof(object)) === 'object' && Number.isFinite(object.size);
+                }
+            }, {
+                key: 'isPlainObject',
+                value: function isPlainObject(object) {
+                    return (typeof object === 'undefined' ? 'undefined' : _typeof(object)) === 'object' && !Number.isFinite(object.size) && !Array.isArray(object);
+                }
+            }, {
+                key: 'pullAt',
+                value: function pullAt(data, index) {
+                    var i = void 0;
+                    var newData = new Array();
+                    for (i = 0; i < data.length; i++) {
+                        if (i === index) {
+                            continue;
+                        }
+                        newData.push(data[i]);
+                    }
+                    return newData;
+                }
+            }, {
+                key: 'concat',
+                value: function concat(data, value) {
+                    if (Array.isArray(value)) {
+                        var i = void 0;
+                        for (i = 0; i < value.length; i++) {
+                            data.push(value[i]);
+                        }
+                    } else {
+                        data.push(value);
+                    }
+                    return data;
+                }
+            }, {
+                key: 'extend',
+                value: function extend(object1, object2) {
+                    var key = void 0;
+                    for (key in object2) {
+                        object1[key] = object2[key];
+                    }
+                    return object1;
+                }
+            }]);
+
+            return Utilities;
+        }();
+
+        var utilities = new Utilities();
 
         /*
         MODEL
@@ -128,7 +153,7 @@
                 var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(Model).call(this));
 
                 // where the data is held for the model
-                if (modelData && utils.isPlainObject(modelData)) {
+                if (modelData && utilities.isPlainObject(modelData)) {
                     _this.set(modelData);
                 } else {
                     _this.set(new Object());
@@ -178,7 +203,7 @@
             }, {
                 key: 'set',
                 value: function set(data) {
-                    if (data && utils.isPlainObject(data)) {
+                    if (data && utilities.isPlainObject(data)) {
                         this.modelData = data;
                         this.message(['change', 'set'], this.get());
                         return true;
@@ -195,8 +220,8 @@
                 key: 'update',
                 value: function update(updateData) {
 
-                    if (updateData && utils.isPlainObject(updateData)) {
-                        this.set(utils.extend(this.get(), updateData));
+                    if (updateData && utilities.isPlainObject(updateData)) {
+                        this.set(utilities.extend(this.get(), updateData));
                         this.message(['change', 'update'], this.get());
                         return true;
                     } else {
@@ -228,7 +253,7 @@
                 var _this2 = _possibleConstructorReturn(this, Object.getPrototypeOf(Collection).call(this));
 
                 // where the data is held for the collection
-                if (collectionData && (Array.isArray(collectionData) || utils.isMap(collectionData))) {
+                if (collectionData && (Array.isArray(collectionData) || utilities.isMap(collectionData))) {
                     _this2.set(collectionData);
                 } else {
                     _this2.set(new Array());
@@ -279,7 +304,7 @@
                 key: 'set',
                 value: function set(data) {
 
-                    if (Array.isArray(data) || utils.isMap(data)) {
+                    if (Array.isArray(data) || utilities.isMap(data)) {
                         this.collectionData = data;
                         this.message(['change', 'set'], this.get());
                         return true;
@@ -304,7 +329,7 @@
                         data = key;
                     }
 
-                    if (utils.isMap(data)) {
+                    if (utilities.isMap(data)) {
                         data.forEach(function (value, key) {
                             savedData.set(key, value);
                         });
@@ -312,7 +337,7 @@
                         this.message(['change', 'push'], this.get());
                         return true;
                     } else if (data) {
-                        this.set(_.concat(savedData, data));
+                        this.set(utilities.concat(savedData, data));
                         this.message(['change', 'push'], this.get());
                         return true;
                     } else {
@@ -322,7 +347,7 @@
             }, {
                 key: 'get',
                 value: function get(index) {
-                    if (index && utils.isMap(this.collectionData)) {
+                    if (index && utilities.isMap(this.collectionData)) {
                         return this.collectionData.get(index);
                     } else if (Number.isFinite(index)) {
                         return this.collectionData[index];
@@ -335,21 +360,21 @@
                 value: function update(index, updateData) {
 
                     // if updating an item in the array or object
-                    if (index !== undefined && updateData !== undefined && this.get(index) && (Array.isArray(this.get()) || utils.isMap(this.get()))) {
+                    if (index !== undefined && updateData !== undefined && this.get(index) && (Array.isArray(this.get()) || utilities.isMap(this.get()))) {
 
                         // if we are updating a model
-                        if (utils.isPlainObject(updateData) && this.get(index).get && utils.isPlainObject(this.get(index).get())) {
-                            this.get(index).set(utils.extend(this.get(index).get(), updateData));
+                        if (utilities.isPlainObject(updateData) && this.get(index).get && utilities.isPlainObject(this.get(index).get())) {
+                            this.get(index).set(utilities.extend(this.get(index).get(), updateData));
                             this.get(index).message(['change', 'update'], this.get(index).get());
                             this.message(['change', 'update'], this.get());
                             return true;
                             // if we are updating a standard object
-                        } else if (utils.isPlainObject(updateData) && utils.isPlainObject(this.get(index))) {
-                                this.collectionData[index] = utils.extend(this.get(index), updateData);
+                        } else if (utilities.isPlainObject(updateData) && utilities.isPlainObject(this.get(index))) {
+                                this.collectionData[index] = utilities.extend(this.get(index), updateData);
                                 this.message(['change', 'update'], this.get());
                                 return true;
                             } else if (updateData) {
-                                if (utils.isMap(this.collectionData)) {
+                                if (utilities.isMap(this.collectionData)) {
                                     this.collectionData.set(index, updateData);
                                 } else {
                                     this.collectionData[index] = updateData;
@@ -357,7 +382,7 @@
                                 this.message(['change', 'update'], this.get());
                                 return true;
                             }
-                    } else if (Array.isArray(index) || utils.isMap(index)) {
+                    } else if (Array.isArray(index) || utilities.isMap(index)) {
                         this.set(index);
                         this.message(['change', 'update'], this.get());
                         return true;
@@ -372,10 +397,10 @@
                     if (index !== undefined) {
 
                         if (Array.isArray(this.get()) && this.get(index)) {
-                            this.set(utils.pullAt(this.collectionData, index));
+                            this.set(utilities.pullAt(this.collectionData, index));
                             this.message(['change', 'delete'], this.get());
                             return true;
-                        } else if (utils.isMap(this.get()) && this.get(index)) {
+                        } else if (utilities.isMap(this.get()) && this.get(index)) {
                             this.collectionData.delete(index);
                             this.message(['change', 'delete'], this.get());
                             return true;
@@ -384,7 +409,7 @@
                         }
                     } else {
                         //keep the same data type
-                        if (utils.isMap(this.get())) {
+                        if (utilities.isMap(this.get())) {
                             this.set(new Map());
                         } else {
                             this.set(new Array());
@@ -402,5 +427,5 @@
             Model: Model,
             Collection: Collection
         };
-    })(_events2.default, _lodash2.default);
+    })(_events2.default);
 });
