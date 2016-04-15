@@ -8,7 +8,16 @@ import EventEmitter from 'events';
     UTILITIES
     */
 
-    const Utilities = class {
+    const Utilities = class extends EventEmitter {
+
+        constructor(modelData) {
+
+            super();
+
+            // used for mediator messaging if in use
+            this.label = '';
+
+        }
 
         isMap(object) {
             return (typeof object === 'object' && Number.isFinite(object.size))
@@ -45,38 +54,11 @@ import EventEmitter from 'events';
         extend(object1, object2) {
             let key;
             for (key in object2) {
-                object1[key] = object2[key];
+                if (object2.hasOwnProperty(key)) {
+                    object1[key] = object2[key];
+                }
             }
             return object1;
-        }
-
-    }
-
-    const utilities = new Utilities();
-
-    /*
-    MODEL
-    */
-
-    const Model = class extends EventEmitter {
-
-        constructor(modelData) {
-
-            super();
-
-            // where the data is held for the model
-            if (modelData && utilities.isPlainObject(modelData)) {
-                this.set(modelData);
-            } else {
-                this.set(new Object());
-            }
-
-            // optionally add in a mediator when extended
-            this.mediator = false;
-
-            // name for this model instance be used in mediator emit. Required on when using a mediator
-            this.name = false;
-
         }
 
         message(messages, data) {
@@ -87,7 +69,7 @@ import EventEmitter from 'events';
                 for (i = 0; i < messages.length; i++) {
                     this.emit(messages[i], data);
                     if (this.name && this.mediator && this.mediator.emit) {
-                        this.mediator.emit('model:' + this.name + ':' + messages[i], data);
+                        this.mediator.emit(this.label + ':' + this.name + ':' + messages[i], data);
                     }
                 }
 
@@ -98,6 +80,35 @@ import EventEmitter from 'events';
                 return false;
 
             }
+
+        }
+
+    }
+
+    /*
+    MODEL
+    */
+
+    const Model = class extends Utilities {
+
+        constructor(modelData) {
+
+            super();
+
+            // where the data is held for the model
+            if (modelData && this.isPlainObject(modelData)) {
+                this.set(modelData);
+            } else {
+                this.set(new Object());
+            }
+
+            this.label = 'model';
+
+            // optionally add in a mediator when extended
+            this.mediator = false;
+
+            // name for this model instance be used in mediator emit. Required on when using a mediator
+            this.name = false;
 
         }
 
@@ -115,7 +126,7 @@ import EventEmitter from 'events';
 
         // the setter
         set(data) {
-            if (data && utilities.isPlainObject(data)) {
+            if (data && this.isPlainObject(data)) {
                 this.modelData = data;
                 this.message(['change', 'set'], this.get());
                 return true;
@@ -132,8 +143,8 @@ import EventEmitter from 'events';
         // the updater
         update(updateData) {
 
-            if (updateData && utilities.isPlainObject(updateData)) {
-                this.set(utilities.extend(this.get(), updateData));
+            if (updateData && this.isPlainObject(updateData)) {
+                this.set(this.extend(this.get(), updateData));
                 this.message(['change', 'update'], this.get());
                 return true;
             } else {
@@ -155,46 +166,26 @@ import EventEmitter from 'events';
     Collection
     */
 
-    const Collection = class extends EventEmitter {
+    const Collection = class extends Utilities {
 
         constructor(collectionData) {
 
             super();
 
             // where the data is held for the collection
-            if (collectionData && (Array.isArray(collectionData) || utilities.isMap(collectionData))) {
+            if (collectionData && (Array.isArray(collectionData) || this.isMap(collectionData))) {
                 this.set(collectionData);
             } else {
                 this.set(new Array());
             }
+
+            this.label = 'collection';
 
             // optionally add in a mediator when extended
             this.mediator = false;
 
             // name for this model instance be used in mediator emit. Required on when using a mediator
             this.name = false;
-
-        }
-
-        message(messages, data) {
-
-            if (Array.isArray(messages), data) {
-
-                let i;
-                for (i = 0; i < messages.length; i++) {
-                    this.emit(messages[i], data);
-                    if (this.name && this.mediator && this.mediator.emit) {
-                        this.mediator.emit('collection:' + this.name + ':' + messages[i], data);
-                    }
-                }
-
-                return true;
-
-            } else {
-
-                return false;
-
-            }
 
         }
 
@@ -213,7 +204,7 @@ import EventEmitter from 'events';
         // the setter
         set(data) {
 
-            if (Array.isArray(data) || utilities.isMap(data)) {
+            if (Array.isArray(data) || this.isMap(data)) {
                 this.collectionData = data;
                 this.message(['change', 'set'], this.get());
                 return true;
@@ -239,7 +230,7 @@ import EventEmitter from 'events';
                 data = key;
             }
 
-            if (utilities.isMap(data)) {
+            if (this.isMap(data)) {
                 data.forEach(function(value, key) {
                     savedData.set(key, value);
                 });
@@ -247,7 +238,7 @@ import EventEmitter from 'events';
                 this.message(['change', 'push'], this.get());
                 return true;
             } else if (data) {
-                this.set(utilities.concat(savedData, data));
+                this.set(this.concat(savedData, data));
                 this.message(['change', 'push'], this.get());
                 return true;
             } else {
@@ -258,7 +249,7 @@ import EventEmitter from 'events';
 
         // the getter
         get(index) {
-            if (index && utilities.isMap(this.collectionData)) {
+            if (index && this.isMap(this.collectionData)) {
                 return this.collectionData.get(index);
             } else if (Number.isFinite(index)) {
                 return this.collectionData[index];
@@ -274,25 +265,25 @@ import EventEmitter from 'events';
             if (index !== undefined
                 && updateData !== undefined
                 && this.get(index)
-                && (Array.isArray(this.get()) || utilities.isMap(this.get())))
+                && (Array.isArray(this.get()) || this.isMap(this.get())))
             {
 
                 // if we are updating a model
-                if (utilities.isPlainObject(updateData)
+                if (this.isPlainObject(updateData)
                     && this.get(index).get
-                    && utilities.isPlainObject(this.get(index).get())
+                    && this.isPlainObject(this.get(index).get())
                 ) {
-                    this.get(index).set(utilities.extend(this.get(index).get(), updateData));
+                    this.get(index).set(this.extend(this.get(index).get(), updateData));
                     this.get(index).message(['change', 'update'], this.get(index).get());
                     this.message(['change', 'update'], this.get());
                     return true;
                 // if we are updating a standard object
-            } else if (utilities.isPlainObject(updateData) && utilities.isPlainObject(this.get(index))) {
-                    this.collectionData[index] = utilities.extend(this.get(index), updateData);
+            } else if (this.isPlainObject(updateData) && this.isPlainObject(this.get(index))) {
+                    this.collectionData[index] = this.extend(this.get(index), updateData);
                     this.message(['change', 'update'], this.get());
                     return true;
                 } else if (updateData) {
-                    if (utilities.isMap(this.collectionData)) {
+                    if (this.isMap(this.collectionData)) {
                         this.collectionData.set(index, updateData);
                     } else {
                         this.collectionData[index] = updateData;
@@ -301,7 +292,7 @@ import EventEmitter from 'events';
                     return true;
                 }
 
-            } else if (Array.isArray(index) || utilities.isMap(index)) {
+            } else if (Array.isArray(index) || this.isMap(index)) {
                 this.set(index);
                 this.message(['change', 'update'], this.get());
                 return true;
@@ -317,10 +308,10 @@ import EventEmitter from 'events';
             if (index !== undefined) {
 
                 if (Array.isArray(this.get()) && this.get(index)) {
-                    this.set(utilities.pullAt(this.collectionData, index));
+                    this.set(this.pullAt(this.collectionData, index));
                     this.message(['change', 'delete'], this.get());
                     return true;
-                } else if (utilities.isMap(this.get()) && this.get(index)) {
+                } else if (this.isMap(this.get()) && this.get(index)) {
                     this.collectionData.delete(index);
                     this.message(['change', 'delete'], this.get());
                     return true;
@@ -330,7 +321,7 @@ import EventEmitter from 'events';
 
             } else {
                 //keep the same data type
-                if (utilities.isMap(this.get())) {
+                if (this.isMap(this.get())) {
                     this.set(new Map());
                 } else {
                     this.set(new Array());
