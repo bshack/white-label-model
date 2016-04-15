@@ -7,6 +7,9 @@
   ],
   "license": "MIT",
   "keywords": [
+    "jasmine",
+    "es6",
+    "es2015",
     "model",
     "collection",
     "javascript",
@@ -15,7 +18,9 @@
   ],
   "homepage": "https://github.com/bshack/white-label-model",
   "moduleType": [
-    "amd"
+    "amd",
+    "es6",
+    "node"
   ],
   "ignore": [
     "**/.*",
