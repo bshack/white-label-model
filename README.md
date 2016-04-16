@@ -27,7 +27,7 @@ white-label-model supports models and collections, this first example is for mod
 ### Require
 
 ```
-var Model = require('white-label-model').Model;
+const Model = require('white-label-model').Model;
 ```
 
 ### Instantiate
@@ -35,13 +35,13 @@ var Model = require('white-label-model').Model;
 Create a new empty model:
 
 ```
-var modelColor = new Model();
+const modelColor = new Model();
 ```
 
 optionally you can also set the model data at instantiation:
 
 ```
-var modelColor = new Model({
+const modelColor = new Model({
     name: 'red'
 });
 ```
@@ -67,7 +67,7 @@ myModel.someGreatFeature();
 Add change listener to the model:
 
 ```
-modelColor.on('change', function(data) {
+modelColor.on('change', (data) => {
     console.log('Model Data Change:', data);
 });
 ```
@@ -91,7 +91,7 @@ This will emit 'change' and 'set' events.
 Retreive the stored model data:
 
 ```
-var redColorData = modelColor.get();
+const redColorData = modelColor.get();
 ```
 
 ### Update
@@ -129,8 +129,8 @@ http://babeljs.io/docs/usage/polyfill/
 ### Require
 
 ```
-var Model = require('white-label-model').Model;
-var Collection = require('white-label-model').Collection;
+const Model = require('white-label-model').Model;
+const Collection = require('white-label-model').Collection;
 ```
 
 ### Instantiate
@@ -138,13 +138,13 @@ var Collection = require('white-label-model').Collection;
 Create a couple new models.
 
 ```
-var modelColor1 = new Model({
+const modelColor1 = new Model({
     name: 'red'
 });
-var modelColor2 = new Model({
+const modelColor2 = new Model({
     name: 'green'
 });
-var modelColor3 = new Model({
+const modelColor3 = new Model({
     name: 'blue'
 });
 ```
@@ -154,35 +154,35 @@ Now create a new collection to hold the models.
 If you want your collection to be an array:
 
 ```
-var modelColors = new Collection();
+const modelColors = new Collection();
 ```
 or
 ```
-var modelColors = new Collection(new Array());
+const modelColors = new Collection(new Array());
 ```
 
 If you want your collection to be a map:
 
 ```
-var modelColors = new Collection(new Map());
+const modelColors = new Collection(new Map());
 ```
 
 Optionally you can also set the collection data at instantiation:
 
-array
+#### array
 
 ```
-var modelColors = new Collection([
+const modelColors = new Collection([
     modelColor1,
     modelColor2,
     modelColor3
 ]);
 ```
 
-map
+#### map
 
 ```
-var modelColors = new Collection(new Map([
+const modelColors = new Collection(new Map([
     ['color1', modelColor1],
     ['color2', modelColor2],
     ['color3', modelColor3]
@@ -209,24 +209,24 @@ myCollection.someGreatFeature();
 
 Add change listeners to the models and the collection:
 
-models:
+#### models:
 
 ```
-modelColor1.on('change', function(data) {
+modelColor1.on('change', (data) => {
     console.log('Model 1 Data Change:', data);
 });
-modelColor2.on('change', function(data) {
+modelColor2.on('change', (data) => {
     console.log('Model 2 Data Change:', data);
 });
-modelColor3.on('change', function(data) {
+modelColor3.on('change', (data) => {
     console.log('Model 3 Data Change:', data);
 });
 ```
 
-collection:
+#### collection:
 
 ```
-modelColors.on('change', function(data) {
+modelColors.on('change', (data) => {
     console.log('Collection Data Change:', data);
 });
 ```
@@ -237,7 +237,7 @@ Whenever these models or this collection change they will emit a 'change' event.
 
 Set the collection contents:
 
-array
+#### array
 
 ```
 modelColor1.set([
@@ -247,10 +247,10 @@ modelColor1.set([
 ]);
 ```
 
-map
+#### map
 
 ```
-var modelColors = new Collection(new Map([
+const modelColors = new Collection(new Map([
     ['color1', modelColor1],
     ['color2', modelColor2],
     ['color3', modelColor3]
@@ -263,7 +263,7 @@ The data must be in an array or map and this will overwrite any existing array d
 
 Add single items to the end of the stored collection:
 
-array
+#### array
 
 ```
 modelColors.push(modelColor1);
@@ -271,7 +271,7 @@ modelColors.push(modelColor2);
 modelColors.push(modelColor3);
 ```
 
-map
+#### map
 
 ```
 modelColors.push('color1', modelColor1);
@@ -281,7 +281,7 @@ modelColors.push('color3', modelColor3);
 
 or add multiple items to the end of the stored collection:
 
-array
+#### array
 
 ```
 modelColor1.push([
@@ -291,7 +291,7 @@ modelColor1.push([
 ]);
 ```
 
-map
+#### map
 
 ```
 modelColor1.push(new Map([
@@ -308,28 +308,28 @@ This will emit 'change' and 'push' events.
 This returns then entire collection data:
 
 ```
-var allColors = modelColors.get();
+const allColors = modelColors.get();
 ```
 
 This returns only a single item from the collection at the specified index:
 
-array
+#### array
 
 ```
-var greenData = modelColors.get(1);
+const greenData = modelColors.get(1);
 ```
 
-map
+#### map
 
 ```
-var greenData = modelColors.get('color2');
+const greenData = modelColors.get('color2');
 ```
 
 ### Update
 
 This updates a single item in the collection with new object data at the specified index:
 
-array
+#### array
 
 ```
 modelColors.update(1, {
@@ -337,7 +337,7 @@ modelColors.update(1, {
 });
 ```
 
-map
+#### map
 
 ```
 modelColors.update('color2', {
@@ -349,13 +349,13 @@ This extends the existing item object data, old properties are overwritten, new 
 
 or when the item data type is not an object it will simply overwrite completely the old data with new:
 
-array
+#### array
 
 ```
 modelColors.update(1, true);
 ```
 
-map
+#### map
 
 ```
 modelColors.update('color2', true);
@@ -365,7 +365,7 @@ This will emit 'change' and 'update' events on the collection and on the item if
 
 When you don't pass in an index argument the collection is updated with all new data:
 
-array
+#### array
 
 ```
 modelColors.update([
@@ -384,7 +384,7 @@ modelColors.update([
 ]);
 ```
 
-map
+#### map
 
 ```
 modelColors.update([
@@ -409,13 +409,13 @@ The new data must be an array or map. This will emit 'change' and 'update' event
 
 This deletes a model from the collection at the specified index:
 
-array
+#### array
 
 ```
 modelColors.delete(2);
 ```
 
-map
+#### map
 
 ```
 modelColors.delete('color3');
