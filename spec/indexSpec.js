@@ -13,7 +13,7 @@ describe("A suite", function() {
 
 
 
-describe("WhiteLabelModel module", function() {
+describe("White Label Model module", function() {
     const Model = WhiteLabelModel.Model;
     const Collection = WhiteLabelModel.Collection;
     it("has a Model function defined", function() {
@@ -72,6 +72,9 @@ describe("A Model", function() {
     });
     it("is has an delete function", function() {
         expect(modelColor.delete).toEqual(jasmine.any(Function));
+    });
+    it("is has an destroy function", function() {
+        expect(modelColor.destroy).toEqual(jasmine.any(Function));
     });
     it("is does not have a mediator setup", function() {
         expect(modelColor.mediator).toEqual(false);
@@ -188,6 +191,10 @@ describe("A Model", function() {
         });
         let deleteReturns = modelColor.delete();
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Object));
+    });
+    it("will return 'this' object when destroy is called", function() {
+        let destroyReturns = modelColor.destroy();
+        expect(destroyReturns).toEqual(jasmine.any(Object));
     });
     it("can be extended", function() {
         expect(modelColor.extendedFunction).toEqual(jasmine.any(Function));
@@ -341,6 +348,9 @@ describe("A Collection array", function() {
     });
     it("is has an delete function", function() {
         expect(modelColors.delete).toEqual(jasmine.any(Function));
+    });
+    it("is has an destroy function", function() {
+        expect(modelColors.destroy).toEqual(jasmine.any(Function));
     });
     it("is does not have a mediator setup", function() {
         expect(modelColors.mediator).toEqual(false);
@@ -651,8 +661,6 @@ describe("A Collection array", function() {
         modelColors.delete();
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Array));
     });
-
-
     it("will add data to the model using push and emit push event with the mediator", function() {
         //fake mediator
         let mediator = new function() {
@@ -757,6 +765,10 @@ describe("A Collection array", function() {
         mediatorCollectionTest.delete();
         expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:delete', jasmine.any(Array));
         expect(mediator.emit).toHaveBeenCalledWith('collection:test-mediator-1:change', jasmine.any(Array));
+    });
+    it("will return 'this' object when destroy is called", function() {
+        let destroyReturns = modelColors.destroy();
+        expect(destroyReturns).toEqual(jasmine.any(Object));
     });
     it("can be extended", function() {
         expect(modelColors.extendedFunction).toEqual(jasmine.any(Function));
@@ -932,8 +944,10 @@ describe("A Collection map", function() {
     });
     it("will update non object data in the collection using update at the specified index", function() {
         modelColors.push('color1', 'red');
+        modelColors.push('color2', 'green');
         let updateReturns = modelColors.update('color1', 'blue');
         expect(modelColors.get('color1')).toEqual('blue');
+        expect(modelColors.get('color2')).toEqual('green');
         expect(updateReturns).toEqual(true);
     });
     it("will not update all model data in the collection when the update data argument is empty with a specified index",

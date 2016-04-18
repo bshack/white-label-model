@@ -3,7 +3,7 @@ import Utilities from './utilities';
 ((Utilities) => {
 
     'use strict';
-    
+
     module.exports = class extends Utilities {
 
         constructor(collectionData) {
@@ -100,23 +100,22 @@ import Utilities from './utilities';
         update(index, updateData) {
 
             // if updating an item in the array or object
-            if (index !== undefined
-                && updateData !== undefined
-                && this.get(index)
-                && (Array.isArray(this.get()) || this.isMap(this.get())))
-            {
+            if (index !== undefined &&
+                updateData !== undefined &&
+                this.get(index) &&
+                (Array.isArray(this.get()) || this.isMap(this.get()))) {
 
                 // if we are updating a model
-                if (this.isPlainObject(updateData)
-                    && this.get(index).get
-                    && this.isPlainObject(this.get(index).get())
+                if (this.isPlainObject(updateData) &&
+                    this.get(index).get &&
+                    this.isPlainObject(this.get(index).get())
                 ) {
                     this.get(index).set(this.extend(this.get(index).get(), updateData));
                     this.get(index).message(['change', 'update'], this.get(index).get());
                     this.message(['change', 'update'], this.get());
                     return true;
-                // if we are updating a standard object
-            } else if (this.isPlainObject(updateData) && this.isPlainObject(this.get(index))) {
+                    // if we are updating a standard object
+                } else if (this.isPlainObject(updateData) && this.isPlainObject(this.get(index))) {
                     this.collectionData[index] = this.extend(this.get(index), updateData);
                     this.message(['change', 'update'], this.get());
                     return true;
