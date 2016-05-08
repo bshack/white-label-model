@@ -1,5 +1,5 @@
 TN:
-SF:/Users/williamshackelford/Sites/white-label-model/spec/indexSpec.js
+SF:/Users/billshackelford/Sites/white-label-model/spec/indexSpec.js
 FN:6,(anonymous_1)
 FN:7,(anonymous_2)
 FN:16,(anonymous_3)
@@ -898,7 +898,7 @@ BRF:0
 BRH:0
 end_of_record
 TN:
-SF:/Users/williamshackelford/Sites/white-label-model/dist/index.js
+SF:/Users/billshackelford/Sites/white-label-model/dist/index.js
 FN:1,(anonymous_1)
 FN:13,(anonymous_2)
 FN:20,_interopRequireDefault
@@ -936,7 +936,7 @@ BRF:10
 BRH:6
 end_of_record
 TN:
-SF:/Users/williamshackelford/Sites/white-label-model/dist/collection.js
+SF:/Users/billshackelford/Sites/white-label-model/dist/collection.js
 FN:1,(anonymous_1)
 FN:13,(anonymous_2)
 FN:18,_interopRequireDefault
@@ -1197,7 +1197,7 @@ BRF:96
 BRH:80
 end_of_record
 TN:
-SF:/Users/williamshackelford/Sites/white-label-model/dist/utilities.js
+SF:/Users/billshackelford/Sites/white-label-model/dist/utilities.js
 FN:1,(anonymous_1)
 FN:13,(anonymous_2)
 FN:18,_interopRequireDefault
@@ -1390,7 +1390,7 @@ BRF:68
 BRH:43
 end_of_record
 TN:
-SF:/Users/williamshackelford/Sites/white-label-model/dist/model.js
+SF:/Users/billshackelford/Sites/white-label-model/dist/model.js
 FN:1,(anonymous_1)
 FN:13,(anonymous_2)
 FN:18,_interopRequireDefault
