@@ -112,6 +112,18 @@
                     return this;
                 }
             }, {
+                key: 'fetch',
+                value: function fetch() {
+
+                    return false;
+                }
+            }, {
+                key: 'save',
+                value: function save() {
+
+                    return false;
+                }
+            }, {
                 key: 'set',
                 value: function set(data) {
 

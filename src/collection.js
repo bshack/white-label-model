@@ -39,6 +39,18 @@ import Utilities from './utilities';
 
         }
 
+        fetch() {
+
+            return false;
+
+        }
+
+        save() {
+
+            return false;
+
+        }
+
         // the setter
         set(data) {
 
