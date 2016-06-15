@@ -430,3 +430,14 @@ modelColors.delete();
 ```
 
 It respect the previous data type. For example if it was a map it will set it to an empty map. This will emit 'change' and 'delete' events.
+
+### Interacting with a service
+
+The following methods have been subbed out for working with data from a service as a basic structure. They all return false by default. You would simply redefined them when extending either the model or collection class.
+
+```
+modelColors.service.get();
+modelColors.service.put();
+modelColors.service.patch();
+modelColors.service.post();
+```

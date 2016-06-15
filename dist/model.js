@@ -100,6 +100,22 @@
                 // name for this model instance be used in mediator emit. Required on when using a mediator
                 _this.name = false;
 
+                //sub service request methods
+                _this.service = {
+                    get: function get() {
+                        return false;
+                    },
+                    patch: function patch() {
+                        return false;
+                    },
+                    put: function put() {
+                        return false;
+                    },
+                    post: function post() {
+                        return false;
+                    }
+                };
+
                 return _this;
             }
 
@@ -114,18 +130,6 @@
                 value: function destroy() {
 
                     return this;
-                }
-            }, {
-                key: 'fetch',
-                value: function fetch() {
-
-                    return false;
-                }
-            }, {
-                key: 'save',
-                value: function save() {
-
-                    return false;
                 }
             }, {
                 key: 'set',
