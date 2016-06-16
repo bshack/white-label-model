@@ -25,22 +25,6 @@ import Utilities from './utilities';
             // name for this model instance be used in mediator emit. Required on when using a mediator
             this.name = false;
 
-            //sub service request methods
-            this.service = {
-                get: () => {
-                    return false;
-                },
-                patch: () => {
-                    return false;
-                },
-                put: () => {
-                    return false;
-                },
-                post: () => {
-                    return false;
-                }
-            }
-
         }
 
         initialize() {
@@ -52,6 +36,31 @@ import Utilities from './utilities';
         destroy() {
 
             return this;
+
+        }
+
+        //sub service request methods
+        serviceGet() {
+
+            return false;
+
+        }
+
+        servicePatch() {
+
+            return false;
+
+        }
+
+        servicePost() {
+
+            return false;
+
+        }
+
+        servicePut() {
+
+            return false;
 
         }
 
