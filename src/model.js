@@ -77,7 +77,7 @@ import Utilities from './utilities';
             this.set({});
             this.message(['change', 'delete'], this.get());
             return true;
-        };
+        }
 
         //sub service request methods
         serviceGet() {

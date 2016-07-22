@@ -75,7 +75,7 @@ import Utilities from './utilities';
                 return false;
             }
 
-        };
+        }
 
         // the pusher
         push(key, data) {
@@ -108,7 +108,7 @@ import Utilities from './utilities';
                 return false;
             }
 
-        };
+        }
 
         // the getter
         get(index) {
@@ -119,7 +119,7 @@ import Utilities from './utilities';
             } else {
                 return this.collectionData;
             }
-        };
+        }
 
         // the updater
         update(index, updateData) {
@@ -162,7 +162,7 @@ import Utilities from './utilities';
                 return false;
             }
 
-        };
+        }
 
         // the deleter
         delete(index) {
@@ -192,7 +192,7 @@ import Utilities from './utilities';
                 return true;
             }
 
-        };
+        }
 
     };
 
