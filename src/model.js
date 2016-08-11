@@ -87,27 +87,30 @@ import Utilities from './utilities';
 
         //sub service request methods
         serviceGet() {
-
-            return false;
-
+            return new Promise((resolve, reject) => {
+                resolve({});
+            });
         }
 
         servicePatch() {
-
-            return false;
-
+            return new Promise((resolve, reject) => {
+                resolve({
+                    success: false,
+                    data: {}
+                });
+            });
         }
 
         servicePost() {
-
-            return false;
-
+            return new Promise((resolve, reject) => {
+                resolve({});
+            });
         }
 
         servicePut() {
-
-            return false;
-
+            return new Promise((resolve, reject) => {
+                resolve({});
+            });
         }
 
     };

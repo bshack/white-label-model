@@ -112,30 +112,6 @@
                     return this;
                 }
             }, {
-                key: 'serviceGet',
-                value: function serviceGet() {
-
-                    return false;
-                }
-            }, {
-                key: 'servicePatch',
-                value: function servicePatch() {
-
-                    return false;
-                }
-            }, {
-                key: 'servicePost',
-                value: function servicePost() {
-
-                    return false;
-                }
-            }, {
-                key: 'servicePut',
-                value: function servicePut() {
-
-                    return false;
-                }
-            }, {
                 key: 'set',
                 value: function set(data, silent) {
 
@@ -274,6 +250,34 @@
                         }
                         return true;
                     }
+                }
+            }, {
+                key: 'serviceGet',
+                value: function serviceGet() {
+                    return new Promise(function (resolve, reject) {
+                        resolve({});
+                    });
+                }
+            }, {
+                key: 'servicePatch',
+                value: function servicePatch() {
+                    return new Promise(function (resolve, reject) {
+                        resolve({});
+                    });
+                }
+            }, {
+                key: 'servicePost',
+                value: function servicePost() {
+                    return new Promise(function (resolve, reject) {
+                        resolve({});
+                    });
+                }
+            }, {
+                key: 'servicePut',
+                value: function servicePut() {
+                    return new Promise(function (resolve, reject) {
+                        resolve({});
+                    });
                 }
             }]);
 

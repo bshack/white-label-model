@@ -159,26 +159,33 @@
             }, {
                 key: 'serviceGet',
                 value: function serviceGet() {
-
-                    return false;
+                    return new Promise(function (resolve, reject) {
+                        resolve({});
+                    });
                 }
             }, {
                 key: 'servicePatch',
                 value: function servicePatch() {
-
-                    return false;
+                    return new Promise(function (resolve, reject) {
+                        resolve({
+                            success: false,
+                            data: {}
+                        });
+                    });
                 }
             }, {
                 key: 'servicePost',
                 value: function servicePost() {
-
-                    return false;
+                    return new Promise(function (resolve, reject) {
+                        resolve({});
+                    });
                 }
             }, {
                 key: 'servicePut',
                 value: function servicePut() {
-
-                    return false;
+                    return new Promise(function (resolve, reject) {
+                        resolve({});
+                    });
                 }
             }]);
 

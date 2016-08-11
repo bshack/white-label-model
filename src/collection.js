@@ -39,31 +39,6 @@ import Utilities from './utilities';
 
         }
 
-        //sub service request methods
-        serviceGet() {
-
-            return false;
-
-        }
-
-        servicePatch() {
-
-            return false;
-
-        }
-
-        servicePost() {
-
-            return false;
-
-        }
-
-        servicePut() {
-
-            return false;
-
-        }
-
         // the setter
         set(data, silent) {
 
@@ -214,6 +189,31 @@ import Utilities from './utilities';
                 return true;
             }
 
+        }
+
+        //sub service request methods
+        serviceGet() {
+            return new Promise((resolve, reject) => {
+                resolve({});
+            });
+        }
+
+        servicePatch() {
+            return new Promise((resolve, reject) => {
+                resolve({});
+            });
+        }
+
+        servicePost() {
+            return new Promise((resolve, reject) => {
+                resolve({});
+            });
+        }
+
+        servicePut() {
+            return new Promise((resolve, reject) => {
+                resolve({});
+            });
         }
 
     };

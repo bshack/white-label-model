@@ -269,7 +269,9 @@ const modelColors = new Collection(new Map([
 ]));
 ```
 
-The data must be in an array or map and this will overwrite any existing array data stored completely. This will emit 'change' and 'set' events.  If you do not what the model to emit any events you can pass in the 'silent' argument like so:
+The data must be in an array or map and this will overwrite any existing array data stored completely.
+
+This will emit 'change' and 'set' events.  If you do not what the model to emit any events you can pass in the 'silent' argument like so:
 
 ```
 modelColor1.set([
@@ -479,7 +481,7 @@ modelColors.delete(false, true);
 
 ## Interacting with an API
 
-The following methods have been subbed out for working with data from a service as a basic structure. They all return false by default. You would simply redefined them when extending either the model or collection class.
+The following methods have been subbed out for working with data from a service as a basic structure. They all return an object by default. You would simply redefined them when extending either the model or collection class.
 
 ```
 modelColors.serviceGet();
@@ -487,3 +489,5 @@ modelColors.servicePatch();
 modelColors.servicePost();
 modelColors.servicePut();
 ```
+
+These return promises by default.
