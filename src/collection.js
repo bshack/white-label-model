@@ -65,11 +65,13 @@ import Utilities from './utilities';
         }
 
         // the setter
-        set(data) {
+        set(data, silent) {
 
             if (Array.isArray(data) || this.isMap(data)) {
                 this.collectionData = data;
-                this.message(['change', 'set'], this.get());
+                if (!silent) {
+                    this.message(['change', 'set'], this.get());
+                }
                 return true;
             } else {
                 return false;
@@ -78,7 +80,7 @@ import Utilities from './utilities';
         }
 
         // the pusher
-        push(key, data) {
+        push(key, data, silent) {
 
             //get the data
             const savedData = this.get();
@@ -86,8 +88,10 @@ import Utilities from './utilities';
             // if we are adding one item to a Map
             if (key && data) {
                 savedData.set(key, data);
-                this.set(savedData);
-                this.message(['change', 'push'], this.get());
+                this.set(savedData, true);
+                if (!silent) {
+                    this.message(['change', 'push'], this.get());
+                }
                 return true;
             } else {
                 data = key;
@@ -97,12 +101,16 @@ import Utilities from './utilities';
                 data.forEach(function(value, key) {
                     savedData.set(key, value);
                 });
-                this.set(savedData);
-                this.message(['change', 'push'], this.get());
+                this.set(savedData, true);
+                if (!silent) {
+                    this.message(['change', 'push'], this.get());
+                }
                 return true;
             } else if (data) {
-                this.set(this.concat(savedData, data));
-                this.message(['change', 'push'], this.get());
+                this.set(this.concat(savedData, data), true);
+                if (!silent) {
+                    this.message(['change', 'push'], this.get());
+                }
                 return true;
             } else {
                 return false;
@@ -122,7 +130,7 @@ import Utilities from './utilities';
         }
 
         // the updater
-        update(index, updateData) {
+        update(index, updateData, silent) {
 
             // if updating an item in the array or object
             if (index !== undefined &&
@@ -136,13 +144,17 @@ import Utilities from './utilities';
                     this.isPlainObject(this.get(index).get())
                 ) {
                     this.get(index).set(this.extend(this.get(index).get(), updateData));
-                    this.get(index).message(['change', 'update'], this.get(index).get());
-                    this.message(['change', 'update'], this.get());
+                    if (!silent) {
+                        this.get(index).message(['change', 'update'], this.get(index).get());
+                        this.message(['change', 'update'], this.get());
+                    }
                     return true;
                     // if we are updating a standard object
                 } else if (this.isPlainObject(updateData) && this.isPlainObject(this.get(index))) {
                     this.collectionData[index] = this.extend(this.get(index), updateData);
-                    this.message(['change', 'update'], this.get());
+                    if (!silent) {
+                        this.message(['change', 'update'], this.get());
+                    }
                     return true;
                 } else if (updateData) {
                     if (this.isMap(this.collectionData)) {
@@ -150,13 +162,17 @@ import Utilities from './utilities';
                     } else {
                         this.collectionData[index] = updateData;
                     }
-                    this.message(['change', 'update'], this.get());
+                    if (!silent) {
+                        this.message(['change', 'update'], this.get());
+                    }
                     return true;
                 }
 
             } else if (Array.isArray(index) || this.isMap(index)) {
-                this.set(index);
-                this.message(['change', 'update'], this.get());
+                this.set(index, true);
+                if (!silent) {
+                    this.message(['change', 'update'], this.get());
+                }
                 return true;
             } else {
                 return false;
@@ -165,17 +181,21 @@ import Utilities from './utilities';
         }
 
         // the deleter
-        delete(index) {
+        delete(index, silent) {
 
-            if (index !== undefined) {
+            if (index !== undefined && index !== false) {
 
                 if (Array.isArray(this.get()) && this.get(index)) {
-                    this.set(this.pullAt(this.collectionData, index));
-                    this.message(['change', 'delete'], this.get());
+                    this.set(this.pullAt(this.collectionData, index), true);
+                    if (!silent) {
+                        this.message(['change', 'delete'], this.get());
+                    }
                     return true;
                 } else if (this.isMap(this.get()) && this.get(index)) {
                     this.collectionData.delete(index);
-                    this.message(['change', 'delete'], this.get());
+                    if (!silent) {
+                        this.message(['change', 'delete'], this.get());
+                    }
                     return true;
                 } else {
                     return false;
@@ -184,11 +204,13 @@ import Utilities from './utilities';
             } else {
                 //keep the same data type
                 if (this.isMap(this.get())) {
-                    this.set(new Map());
+                    this.set(new Map(), true);
                 } else {
-                    this.set(new Array());
+                    this.set(new Array(), true);
                 }
-                this.message(['change', 'delete'], this.get());
+                if (!silent) {
+                    this.message(['change', 'delete'], this.get());
+                }
                 return true;
             }
 

@@ -2,11 +2,7 @@
 
 [![Build Status](https://travis-ci.org/bshack/white-label-model.svg?branch=master)](https://travis-ci.org/bshack/white-label-model) [![Coverage Status](https://coveralls.io/repos/github/bshack/white-label-model/badge.svg?branch=master)](https://coveralls.io/github/bshack/white-label-model?branch=master)
 
-A simple ES6 JS data model that emits events on data change. Offers support for collections of models.
-
-Learn more about ES6 classes here:
-
-https://babeljs.io/docs/learn-es2015/
+A simple ES6 JS data model that emits events on data change. Offers support for collections of models. Models are for object literals and collections are for arrays and maps.
 
 Model and collection events are emitted using Node.js' events module. For more options on how to listen to events please look at the Node.js documentation:
 
@@ -84,7 +80,13 @@ modelColor.set({
 });
 ```
 
-This will emit 'change' and 'set' events.
+This will emit 'change' and 'set' events. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
+
+```
+modelColor.set({
+    name: 'red'
+}, true);
+```
 
 ### Get
 
@@ -105,7 +107,14 @@ modelColor.update({
 });
 ```
 
-This extends the existing model data, old properties are overwritten, new properties are added to the model. This will emit 'change' and 'update' events.
+This extends the existing model data, old properties are overwritten, new properties are added to the model. This will emit 'change' and 'update' events. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
+
+```
+modelColor.update({
+    name: 'blue',
+    isPrimaryColor: true
+}, true);
+```
 
 ### Delete
 
@@ -115,8 +124,11 @@ This sets the model data to an empty object:
 modelColor.delete();
 ```
 
-This will emit 'change' and 'delete' events.
+This will emit 'change' and 'delete' events. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
 
+```
+modelColor.delete(true);
+```
 
 ## Collection Usage
 
@@ -257,7 +269,15 @@ const modelColors = new Collection(new Map([
 ]));
 ```
 
-The data must be in an array or map and this will overwrite any existing array data stored completely. This will emit 'change' and 'set' events.
+The data must be in an array or map and this will overwrite any existing array data stored completely. This will emit 'change' and 'set' events.  If you do not what the model to emit any events you can pass in the 'silent' argument like so:
+
+```
+modelColor1.set([
+    modelColor1,
+    modelColor2,
+    modelColor3
+], true);
+```
 
 ### Push
 
@@ -301,7 +321,17 @@ modelColor1.push(new Map([
 ]));
 ```
 
-This will emit 'change' and 'push' events.
+This will emit 'change' and 'push' events. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
+
+```
+modelColors.push(modelColor1, false, true);
+```
+
+or
+
+```
+modelColors.push('color1', modelColor1, true);
+```
 
 ### Get
 
@@ -403,7 +433,13 @@ modelColors.update([
 ]);
 ```
 
-The new data must be an array or map. This will emit 'change' and 'update' events only on the collection.
+The new data must be an array or map. This will emit 'change' and 'update' events only on the collection. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
+
+```
+modelColors.update(1, {
+    isPrimaryColor: true
+}, true);
+```
 
 ### Delete
 
@@ -421,15 +457,25 @@ modelColors.delete(2);
 modelColors.delete('color3');
 ```
 
-This will emit 'change' and 'delete' events.
-
 This sets the collection data to an empty array or map.
 
 ```
 modelColors.delete();
 ```
 
-It respect the previous data type. For example if it was a map it will set it to an empty map. This will emit 'change' and 'delete' events.
+It respect the previous data type. For example if it was a map it will set it to an empty map.
+
+This will emit 'change' and 'delete' events. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
+
+```
+modelColors.delete(2, true);
+```
+
+or
+
+```
+modelColors.delete(false, true);
+```
 
 ## Interacting with an API
 

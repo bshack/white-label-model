@@ -104,12 +104,26 @@ describe("A Model", function() {
         expect(modelColor.modelData.name).toEqual('red');
         expect(setReturns).toEqual(true);
     });
+    it("will save data in the model using set and passing silent argument", function() {
+        let setReturns = modelColor.set({
+            name: 'red'
+        }, true);
+        expect(modelColor.modelData.name).toEqual('red');
+        expect(setReturns).toEqual(true);
+    });
     it("will save data in the model using set and emit set event", function() {
         modelColor.on('set', this.callback);
         let setReturns = modelColor.set({
             name: 'red'
         });
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Object));
+    });
+    it("will save data in the model using set and will not emit set event when passing the silent argument", function() {
+        modelColor.on('set', this.callback);
+        let setReturns = modelColor.set({
+            name: 'red'
+        }, true);
+        expect(this.callback).not.toHaveBeenCalledWith(jasmine.any(Object));
     });
     it("will save data in the model using set and emit change event", function() {
         modelColor.on('change', this.callback);
@@ -146,6 +160,22 @@ describe("A Model", function() {
         expect(updateReturns).toEqual(true);
         expect(updateReturnsEmpty).toEqual(false);
     });
+    it("will update data in the model using update and passing silent argument", function() {
+        modelColor.set({
+            name: 'red'
+        });
+        let updateReturns = modelColor.update({
+            name: 'blue',
+            isPrimaryColor: true
+        }, true);
+        let updateReturnsEmpty = modelColor.update();
+        expect(modelColor.get()).toEqual({
+            name: 'blue',
+            isPrimaryColor: true
+        });
+        expect(updateReturns).toEqual(true);
+        expect(updateReturnsEmpty).toEqual(false);
+    });
     it("will update data in the model using update and emit update event", function() {
         modelColor.on('update', this.callback);
         modelColor.set({
@@ -156,6 +186,17 @@ describe("A Model", function() {
             isPrimaryColor: true
         });
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Object));
+    });
+    it("will update data in the model using update and not emit update event when passing slient argument", function() {
+        modelColor.on('update', this.callback);
+        modelColor.set({
+            name: 'red'
+        });
+        let updateReturns = modelColor.update({
+            name: 'blue',
+            isPrimaryColor: true
+        }, true);
+        expect(this.callback).not.toHaveBeenCalledWith(jasmine.any(Object));
     });
     it("will update data in the model using update and emit change event", function() {
         modelColor.on('change', this.callback);
@@ -176,6 +217,14 @@ describe("A Model", function() {
         expect(modelColor.get()).toEqual({});
         expect(deleteReturns).toEqual(true);
     });
+    it("will remove the data from the model using delete when passing silent argument", function() {
+        modelColor.set({
+            name: 'red'
+        });
+        let deleteReturns = modelColor.delete(true);
+        expect(modelColor.get()).toEqual({});
+        expect(deleteReturns).toEqual(true);
+    });
     it("will remove data in the model using delete and emit delete event", function() {
         modelColor.on('delete', this.callback);
         modelColor.set({
@@ -183,6 +232,14 @@ describe("A Model", function() {
         });
         let deleteReturns = modelColor.delete();
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Object));
+    });
+    it("will remove data in the model using delete and emit delete event when passing silent argument", function() {
+        modelColor.on('delete', this.callback);
+        modelColor.set({
+            name: 'red'
+        });
+        let deleteReturns = modelColor.delete(true);
+        expect(this.callback).not.toHaveBeenCalledWith(jasmine.any(Object));
     });
     it("will remove data in the model using delete and emit change event", function() {
         modelColor.on('change', this.callback);
@@ -388,6 +445,17 @@ describe("A Collection array", function() {
         });
         expect(setReturns).toEqual(true);
     });
+    it("will save data in the collection using set with the silent argument defined", function() {
+        let setReturns = modelColors.set([
+            modelColor1,
+            modelColor2,
+            modelColor3
+        ], true);
+        expect(modelColors.collectionData[0].modelData).toEqual({
+            name: 'red'
+        });
+        expect(setReturns).toEqual(true);
+    });
     it("will not save data in the collection using set when the data is not an array or map", function() {
         let setReturns = modelColors.set('someString');
         expect(modelColors.collectionData).toEqual([]);
@@ -407,6 +475,17 @@ describe("A Collection array", function() {
         ]);
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Array));
     });
+    it("will save data in the collection using set and not emit set event with the silent argument", function() {
+        this.callback = function(data) {};
+        spyOn(this, 'callback');
+        modelColors.on('set', this.callback);
+        let setReturns = modelColors.set([
+            modelColor1,
+            modelColor2,
+            modelColor3
+        ], true);
+        expect(this.callback).not.toHaveBeenCalled();
+    });
     it("will save data in the collection using set and emit change event", function() {
         this.callback = function(data) {};
         spyOn(this, 'callback');
@@ -424,6 +503,17 @@ describe("A Collection array", function() {
             modelColor2,
             modelColor3
         ]);
+        expect(modelColors.collectionData[2].modelData).toEqual({
+            name: 'blue'
+        });
+        expect(pushReturns).toEqual(true);
+    });
+    it("will save data to the end of the collection using push with an array with silent argument", function() {
+        modelColors.push(modelColor1);
+        let pushReturns = modelColors.push([
+            modelColor2,
+            modelColor3
+        ], false, true);
         expect(modelColors.collectionData[2].modelData).toEqual({
             name: 'blue'
         });
@@ -451,6 +541,17 @@ describe("A Collection array", function() {
             modelColor3
         ]);
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Array));
+    });
+    it("will save data in the collection using push and will not emit push event with silent argument passed in", function() {
+        this.callback = function(data) {};
+        spyOn(this, 'callback');
+        modelColors.on('push', this.callback);
+        modelColors.push(modelColor1, false, true);
+        let pushReturns = modelColors.push([
+            modelColor2,
+            modelColor3
+        ], false, true);
+        expect(this.callback).not.toHaveBeenCalled();
     });
     it("will save data in the collection using push and emit change event", function() {
         this.callback = function(data) {};
@@ -486,6 +587,18 @@ describe("A Collection array", function() {
             name: 'blue',
             isPrimaryColor: true
         });
+        expect(modelColors.get(0).modelData).toEqual({
+            name: 'blue',
+            isPrimaryColor: true
+        });
+        expect(updateReturns).toEqual(true);
+    });
+    it("will update model data in the collection using update at the specified index with the silent argument passed in", function() {
+        modelColors.push(modelColor1);
+        let updateReturns = modelColors.update(0, {
+            name: 'blue',
+            isPrimaryColor: true
+        }, true);
         expect(modelColors.get(0).modelData).toEqual({
             name: 'blue',
             isPrimaryColor: true
@@ -577,6 +690,17 @@ describe("A Collection array", function() {
         });
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Array));
     });
+    it("will update data in the collection using update and not emit update event with silent argument passed in", function() {
+        this.callback = function(data) {};
+        spyOn(this, 'callback');
+        modelColors.on('update', this.callback);
+        modelColors.push(modelColor1);
+        let updateReturns = modelColors.update(0, {
+            name: 'blue',
+            isPrimaryColor: true
+        }, true);
+        expect(this.callback).not.toHaveBeenCalled();
+    });
     it("will update data in the collection using update and emit change event", function() {
         this.callback = function(data) {};
         spyOn(this, 'callback');
@@ -641,6 +765,15 @@ describe("A Collection array", function() {
         expect(modelColors.get().length).toEqual(0);
         expect(deleteReturns).toEqual(true);
     });
+    it("will remove all the model data from the collection using delete and passing in silent argument", function() {
+        modelColors.push({
+            name: 'red'
+        });
+        let deleteReturns = modelColors.delete(false, true);
+        expect(modelColors.get()).toEqual(jasmine.any(Array));
+        expect(modelColors.get().length).toEqual(0);
+        expect(deleteReturns).toEqual(true);
+    });
     it("will remove data in the collection using delete and emit delete event", function() {
         this.callback = function(data) {};
         spyOn(this, 'callback');
@@ -650,6 +783,16 @@ describe("A Collection array", function() {
         });
         modelColors.delete();
         expect(this.callback).toHaveBeenCalledWith(jasmine.any(Array));
+    });
+    it("will remove data in the collection using delete and not emit delete event when passing silent argument", function() {
+        this.callback = function(data) {};
+        spyOn(this, 'callback');
+        modelColors.on('delete', this.callback);
+        let deleteReturns = modelColors.push({
+            name: 'red'
+        });
+        modelColors.delete(false, true);
+        expect(this.callback).not.toHaveBeenCalled();
     });
     it("will remove data in the collection using delete and emit change event", function() {
         this.callback = function(data) {};

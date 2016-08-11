@@ -137,11 +137,13 @@
                 }
             }, {
                 key: 'set',
-                value: function set(data) {
+                value: function set(data, silent) {
 
                     if (Array.isArray(data) || this.isMap(data)) {
                         this.collectionData = data;
-                        this.message(['change', 'set'], this.get());
+                        if (!silent) {
+                            this.message(['change', 'set'], this.get());
+                        }
                         return true;
                     } else {
                         return false;
@@ -149,7 +151,7 @@
                 }
             }, {
                 key: 'push',
-                value: function push(key, data) {
+                value: function push(key, data, silent) {
 
                     //get the data
                     var savedData = this.get();
@@ -157,8 +159,10 @@
                     // if we are adding one item to a Map
                     if (key && data) {
                         savedData.set(key, data);
-                        this.set(savedData);
-                        this.message(['change', 'push'], this.get());
+                        this.set(savedData, true);
+                        if (!silent) {
+                            this.message(['change', 'push'], this.get());
+                        }
                         return true;
                     } else {
                         data = key;
@@ -168,12 +172,16 @@
                         data.forEach(function (value, key) {
                             savedData.set(key, value);
                         });
-                        this.set(savedData);
-                        this.message(['change', 'push'], this.get());
+                        this.set(savedData, true);
+                        if (!silent) {
+                            this.message(['change', 'push'], this.get());
+                        }
                         return true;
                     } else if (data) {
-                        this.set(this.concat(savedData, data));
-                        this.message(['change', 'push'], this.get());
+                        this.set(this.concat(savedData, data), true);
+                        if (!silent) {
+                            this.message(['change', 'push'], this.get());
+                        }
                         return true;
                     } else {
                         return false;
@@ -192,7 +200,7 @@
                 }
             }, {
                 key: 'update',
-                value: function update(index, updateData) {
+                value: function update(index, updateData, silent) {
 
                     // if updating an item in the array or object
                     if (index !== undefined && updateData !== undefined && this.get(index) && (Array.isArray(this.get()) || this.isMap(this.get()))) {
@@ -200,26 +208,34 @@
                         // if we are updating a model
                         if (this.isPlainObject(updateData) && this.get(index).get && this.isPlainObject(this.get(index).get())) {
                             this.get(index).set(this.extend(this.get(index).get(), updateData));
-                            this.get(index).message(['change', 'update'], this.get(index).get());
-                            this.message(['change', 'update'], this.get());
+                            if (!silent) {
+                                this.get(index).message(['change', 'update'], this.get(index).get());
+                                this.message(['change', 'update'], this.get());
+                            }
                             return true;
                             // if we are updating a standard object
                         } else if (this.isPlainObject(updateData) && this.isPlainObject(this.get(index))) {
-                                this.collectionData[index] = this.extend(this.get(index), updateData);
+                            this.collectionData[index] = this.extend(this.get(index), updateData);
+                            if (!silent) {
                                 this.message(['change', 'update'], this.get());
-                                return true;
-                            } else if (updateData) {
-                                if (this.isMap(this.collectionData)) {
-                                    this.collectionData.set(index, updateData);
-                                } else {
-                                    this.collectionData[index] = updateData;
-                                }
-                                this.message(['change', 'update'], this.get());
-                                return true;
                             }
+                            return true;
+                        } else if (updateData) {
+                            if (this.isMap(this.collectionData)) {
+                                this.collectionData.set(index, updateData);
+                            } else {
+                                this.collectionData[index] = updateData;
+                            }
+                            if (!silent) {
+                                this.message(['change', 'update'], this.get());
+                            }
+                            return true;
+                        }
                     } else if (Array.isArray(index) || this.isMap(index)) {
-                        this.set(index);
-                        this.message(['change', 'update'], this.get());
+                        this.set(index, true);
+                        if (!silent) {
+                            this.message(['change', 'update'], this.get());
+                        }
                         return true;
                     } else {
                         return false;
@@ -227,17 +243,21 @@
                 }
             }, {
                 key: 'delete',
-                value: function _delete(index) {
+                value: function _delete(index, silent) {
 
-                    if (index !== undefined) {
+                    if (index !== undefined && index !== false) {
 
                         if (Array.isArray(this.get()) && this.get(index)) {
-                            this.set(this.pullAt(this.collectionData, index));
-                            this.message(['change', 'delete'], this.get());
+                            this.set(this.pullAt(this.collectionData, index), true);
+                            if (!silent) {
+                                this.message(['change', 'delete'], this.get());
+                            }
                             return true;
                         } else if (this.isMap(this.get()) && this.get(index)) {
                             this.collectionData.delete(index);
-                            this.message(['change', 'delete'], this.get());
+                            if (!silent) {
+                                this.message(['change', 'delete'], this.get());
+                            }
                             return true;
                         } else {
                             return false;
@@ -245,11 +265,13 @@
                     } else {
                         //keep the same data type
                         if (this.isMap(this.get())) {
-                            this.set(new Map());
+                            this.set(new Map(), true);
                         } else {
-                            this.set(new Array());
+                            this.set(new Array(), true);
                         }
-                        this.message(['change', 'delete'], this.get());
+                        if (!silent) {
+                            this.message(['change', 'delete'], this.get());
+                        }
                         return true;
                     }
                 }

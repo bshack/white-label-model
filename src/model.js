@@ -44,10 +44,12 @@ import Utilities from './utilities';
         }
 
         // the setter
-        set(data) {
+        set(data, silent) {
             if (data && this.isPlainObject(data)) {
                 this.modelData = data;
-                this.message(['change', 'set'], this.get());
+                if (!silent) {
+                    this.message(['change', 'set'], this.get());
+                }
                 return true;
             } else {
                 return false;
@@ -60,11 +62,13 @@ import Utilities from './utilities';
         }
 
         // the updater
-        update(updateData) {
+        update(updateData, silent) {
 
             if (updateData && this.isPlainObject(updateData)) {
-                this.set(this.extend(this.get(), updateData));
-                this.message(['change', 'update'], this.get());
+                this.set(this.extend(this.get(), updateData), true);
+                if (!silent) {
+                    this.message(['change', 'update'], this.get());
+                }
                 return true;
             } else {
                 return false;
@@ -73,9 +77,11 @@ import Utilities from './utilities';
         }
 
         // the deleter
-        delete() {
-            this.set({});
-            this.message(['change', 'delete'], this.get());
+        delete(silent) {
+            this.set({}, true);
+            if (!silent) {
+                this.message(['change', 'delete'], this.get());
+            }
             return true;
         }
 
