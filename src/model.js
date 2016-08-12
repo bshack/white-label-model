@@ -94,10 +94,7 @@ import Utilities from './utilities';
 
         servicePatch() {
             return new Promise((resolve, reject) => {
-                resolve({
-                    success: false,
-                    data: {}
-                });
+                resolve({});
             });
         }
 
