@@ -167,10 +167,7 @@
                 key: 'servicePatch',
                 value: function servicePatch() {
                     return new Promise(function (resolve, reject) {
-                        resolve({
-                            success: false,
-                            data: {}
-                        });
+                        resolve({});
                     });
                 }
             }, {
