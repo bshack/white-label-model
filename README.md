@@ -138,7 +138,7 @@ Call this when you are done using the model:
 modelColor.destroy();
 ```
 
-This delete all the data and remove all listeners on the model.
+This will delete all the data and remove all listeners for the model.
 
 
 ## Collection Usage
