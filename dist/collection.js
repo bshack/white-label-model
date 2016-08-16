@@ -109,6 +109,12 @@
                 key: 'destroy',
                 value: function destroy() {
 
+                    //delete all the data
+                    this.delete(false, true);
+
+                    // remove all node events
+                    this.removeAllListeners();
+
                     return this;
                 }
             }, {

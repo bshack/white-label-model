@@ -130,6 +130,17 @@ This will emit 'change' and 'delete' events. If you do not what the model to emi
 modelColor.delete(true);
 ```
 
+### Destroy
+
+Call this when you are done using the model:
+
+```
+modelColor.destroy();
+```
+
+This delete all the data and remove all listeners on the model.
+
+
 ## Collection Usage
 
 Collections can be either arrays or maps. They will default to arrays unless otherwise set. They can hold models or any other data types.

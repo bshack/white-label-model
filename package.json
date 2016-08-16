@@ -1,6 +1,6 @@
 {
   "name": "white-label-model",
-  "version": "1.0.34",
+  "version": "1.0.35",
   "description": "A simple ES6 JS data model that emits events on data change. Offers support for collections of models.",
   "main": "dist/index.js",
   "engines": {
