@@ -727,6 +727,7 @@ describe("A Collection array", function() {
                 name: 'black'
             })
         ]);
+        console.log(modelColors);
         let deleteReturns = modelColors.delete(2);
         expect(modelColors.get(2).modelData).toEqual({
             name: 'black'

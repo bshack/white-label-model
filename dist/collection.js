@@ -79,7 +79,7 @@
             function _class(collectionData) {
                 _classCallCheck(this, _class);
 
-                var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(_class).call(this));
+                var _this = _possibleConstructorReturn(this, (_class.__proto__ || Object.getPrototypeOf(_class)).call(this));
 
                 // where the data is held for the collection
                 if (collectionData && (Array.isArray(collectionData) || _this.isMap(collectionData))) {

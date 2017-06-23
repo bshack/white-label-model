@@ -1,31 +1,27 @@
 (function (global, factory) {
     if (typeof define === "function" && define.amd) {
-        define(['module', 'events'], factory);
+        define(['module', 'events', 'lodash'], factory);
     } else if (typeof exports !== "undefined") {
-        factory(module, require('events'));
+        factory(module, require('events'), require('lodash'));
     } else {
         var mod = {
             exports: {}
         };
-        factory(mod, global.events);
+        factory(mod, global.events, global.lodash);
         global.utilities = mod.exports;
     }
-})(this, function (module, _events) {
+})(this, function (module, _events, _lodash) {
     'use strict';
 
     var _events2 = _interopRequireDefault(_events);
+
+    var _lodash2 = _interopRequireDefault(_lodash);
 
     function _interopRequireDefault(obj) {
         return obj && obj.__esModule ? obj : {
             default: obj
         };
     }
-
-    var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
-        return typeof obj;
-    } : function (obj) {
-        return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj;
-    };
 
     function _classCallCheck(instance, Constructor) {
         if (!(instance instanceof Constructor)) {
@@ -89,7 +85,7 @@
             function _class(modelData) {
                 _classCallCheck(this, _class);
 
-                var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(_class).call(this));
+                var _this = _possibleConstructorReturn(this, (_class.__proto__ || Object.getPrototypeOf(_class)).call(this));
 
                 // used for mediator messaging if in use
                 _this.label = '';
@@ -100,12 +96,12 @@
             _createClass(_class, [{
                 key: 'isMap',
                 value: function isMap(object) {
-                    return (typeof object === 'undefined' ? 'undefined' : _typeof(object)) === 'object' && Number.isFinite(object.size);
+                    return _lodash2.default.isMap(object);
                 }
             }, {
                 key: 'isPlainObject',
                 value: function isPlainObject(object) {
-                    return (typeof object === 'undefined' ? 'undefined' : _typeof(object)) === 'object' && !Number.isFinite(object.size) && !Array.isArray(object);
+                    return _lodash2.default.isPlainObject(object);
                 }
             }, {
                 key: 'pullAt',
@@ -123,26 +119,12 @@
             }, {
                 key: 'concat',
                 value: function concat(data, value) {
-                    if (Array.isArray(value)) {
-                        var i = void 0;
-                        for (i = 0; i < value.length; i++) {
-                            data.push(value[i]);
-                        }
-                    } else {
-                        data.push(value);
-                    }
-                    return data;
+                    return _lodash2.default.concat(data, value);
                 }
             }, {
                 key: 'extend',
                 value: function extend(object1, object2) {
-                    var key = void 0;
-                    for (key in object2) {
-                        if (object2.hasOwnProperty(key)) {
-                            object1[key] = object2[key];
-                        }
-                    }
-                    return object1;
+                    return _lodash2.default.extend(object1, object2);
                 }
             }, {
                 key: 'message',

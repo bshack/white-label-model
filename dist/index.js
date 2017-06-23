@@ -1,13 +1,13 @@
 (function (global, factory) {
     if (typeof define === "function" && define.amd) {
-        define(['module', './collection', './model'], factory);
+        define(['module', './collection', './model', 'babel-polyfill'], factory);
     } else if (typeof exports !== "undefined") {
-        factory(module, require('./collection'), require('./model'));
+        factory(module, require('./collection'), require('./model'), require('babel-polyfill'));
     } else {
         var mod = {
             exports: {}
         };
-        factory(mod, global.collection, global.model);
+        factory(mod, global.collection, global.model, global.babelPolyfill);
         global.index = mod.exports;
     }
 })(this, function (module, _collection, _model) {

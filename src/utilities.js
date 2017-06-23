@@ -1,4 +1,5 @@
 import EventEmitter from 'events';
+import _ from 'lodash';
 
 ((EventEmitter) => {
 
@@ -20,11 +21,11 @@ import EventEmitter from 'events';
         }
 
         isMap(object) {
-            return (typeof object === 'object' && Number.isFinite(object.size))
+            return _.isMap(object);
         }
 
         isPlainObject(object) {
-            return (typeof object === 'object' && !Number.isFinite(object.size)  && !Array.isArray(object))
+            return _.isPlainObject(object);
         }
 
         pullAt(data, index) {
@@ -40,25 +41,11 @@ import EventEmitter from 'events';
         }
 
         concat(data, value) {
-            if (Array.isArray(value)) {
-                let i;
-                for (i = 0; i < value.length; i++) {
-                    data.push(value[i]);
-                }
-            } else {
-                data.push(value);
-            }
-            return data;
+            return _.concat(data, value);
         }
 
         extend(object1, object2) {
-            let key;
-            for (key in object2) {
-                if (object2.hasOwnProperty(key)) {
-                    object1[key] = object2[key];
-                }
-            }
-            return object1;
+            return _.extend(object1, object2);
         }
 
         message(messages, data) {
