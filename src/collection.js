@@ -103,7 +103,7 @@ import Utilities from './utilities';
         get(index) {
             if (index && this.isMap(this.collectionData)) {
                 return this.collectionData.get(index);
-            } else if (Number.isFinite(index)) {
+            } else if (this.isFinite(index)) {
                 return this.collectionData[index];
             } else {
                 return this.collectionData;

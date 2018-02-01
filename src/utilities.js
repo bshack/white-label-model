@@ -24,6 +24,10 @@ import _ from 'lodash';
             return _.isMap(object);
         }
 
+        isFinite(number) {
+            return _.isFinite(number);
+        }
+
         isPlainObject(object) {
             return _.isPlainObject(object);
         }

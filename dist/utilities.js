@@ -99,6 +99,11 @@
                     return _lodash2.default.isMap(object);
                 }
             }, {
+                key: 'isFinite',
+                value: function isFinite(number) {
+                    return _lodash2.default.isFinite(number);
+                }
+            }, {
                 key: 'isPlainObject',
                 value: function isPlainObject(object) {
                     return _lodash2.default.isPlainObject(object);
