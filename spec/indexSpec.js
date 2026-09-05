@@ -345,8 +345,6 @@ describe("A Model", function() {
 
 
 describe("A Collection array", function() {
-    this.callback = function(data) {};
-    spyOn(this, 'callback');
     const Model = WhiteLabelModel.Model;
     const Collection = WhiteLabelModel.Collection;
     let modelColor1;
@@ -925,8 +923,6 @@ describe("A Collection array", function() {
 
 
 describe("A Collection map", function() {
-    this.callback = function(data) {};
-    spyOn(this, 'callback');
     const Model = WhiteLabelModel.Model;
     const Collection = WhiteLabelModel.Collection;
     let modelColor1;

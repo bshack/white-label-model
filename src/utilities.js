@@ -49,7 +49,25 @@ import _ from 'lodash';
         }
 
         extend(object1, object2) {
-            return _.extend(object1, object2);
+            // Copy only own, safe properties into a new object. In particular,
+            // never treat attacker-controlled prototype keys as data or mutate
+            // a caller-owned object while applying an update.
+            const result = {};
+            const blockedKeys = ['__proto__', 'constructor', 'prototype'];
+
+            [object1, object2].forEach((source) => {
+                if (!source) {
+                    return;
+                }
+
+                Object.keys(source).forEach((key) => {
+                    if (blockedKeys.indexOf(key) === -1) {
+                        result[key] = source[key];
+                    }
+                });
+            });
+
+            return result;
         }
 
         message(messages, data) {

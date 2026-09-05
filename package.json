@@ -4,8 +4,8 @@
   "description": "A simple ES6 JS data model that emits events on data change. Offers support for collections of models.",
   "main": "dist/index.js",
   "engines": {
-    "node": ">=4.0",
-    "npm": ">=2.0"
+    "node": ">=20.0",
+    "npm": ">=10.0"
   },
   "keywords": [
     "jasmine",
@@ -25,7 +25,8 @@
     }
   ],
   "scripts": {
-    "test": "istanbul cover jasmine-node --captureExceptions spec/ && cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js && rm -rf ./coverage"
+    "test": "jasmine && node --test test/*.test.js",
+    "audit": "npm audit --audit-level=high"
   },
   "repository": {
     "type": "git",
@@ -42,15 +43,10 @@
   },
   "homepage": "https://github.com/bshack/white-label-model#readme",
   "dependencies": {
-    "events": "x.x.x",
-    "lodash": "x.x.x"
+    "events": "3.3.0",
+    "lodash": "4.18.1"
   },
   "devDependencies": {
-    "babel-cli": "x.x.x",
-    "babel-plugin-transform-es2015-modules-umd": "x.x.x",
-    "babel-preset-es2015": "x.x.x",
-    "coveralls": "x.x.x",
-    "istanbul": "x.x.x",
-    "jasmine-node": "x.x.x"
+    "jasmine": "7.0.0"
   }
 }

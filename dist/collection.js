@@ -197,7 +197,12 @@
                             return true;
                             // if we are updating a standard object
                         } else if (this.isPlainObject(updateData) && this.isPlainObject(this.get(index))) {
-                            this.collectionData[index] = this.extend(this.get(index), updateData);
+                            var updatedData = this.extend(this.get(index), updateData);
+                            if (this.isMap(this.collectionData)) {
+                                this.collectionData.set(index, updatedData);
+                            } else {
+                                this.collectionData[index] = updatedData;
+                            }
                             if (!silent) {
                                 this.message(['change', 'update'], this.get());
                             }
