@@ -1,167 +1,82 @@
 (function (global, factory) {
-    if (typeof define === "function" && define.amd) {
-        define(['module', 'events'], factory);
-    } else if (typeof exports !== "undefined") {
-        factory(module, require('events'));
-    } else {
-        var mod = {
-            exports: {}
-        };
-        factory(mod, global.events);
-        global.utilities = mod.exports;
-    }
-})(this, function (module, _events) {
+  if (typeof define === "function" && define.amd) {
+    define(["events"], factory);
+  } else if (typeof exports !== "undefined") {
+    factory(require("events"));
+  } else {
+    var mod = {
+      exports: {}
+    };
+    factory(global.events);
+    global.utilities = mod.exports;
+  }
+})(typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : this, function (_events) {
+  "use strict";
+
+  _events = _interopRequireDefault(_events);
+  function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+  (EventEmitter => {
     'use strict';
 
-    var _events2 = _interopRequireDefault(_events);
+    /*
+    UTILITIES
+    */
+    module.exports = class extends EventEmitter {
+      constructor(modelData) {
+        super();
 
-    function _interopRequireDefault(obj) {
-        return obj && obj.__esModule ? obj : {
-            default: obj
-        };
-    }
-
-    function _classCallCheck(instance, Constructor) {
-        if (!(instance instanceof Constructor)) {
-            throw new TypeError("Cannot call a class as a function");
+        // used for mediator messaging if in use
+        this.label = '';
+      }
+      isMap(object) {
+        return Object.prototype.toString.call(object) === '[object Map]';
+      }
+      isFinite(number) {
+        return Number.isFinite(number);
+      }
+      isPlainObject(object) {
+        if (Object.prototype.toString.call(object) !== '[object Object]') {
+          return false;
         }
-    }
-
-    var _createClass = function () {
-        function defineProperties(target, props) {
-            for (var i = 0; i < props.length; i++) {
-                var descriptor = props[i];
-                descriptor.enumerable = descriptor.enumerable || false;
-                descriptor.configurable = true;
-                if ("value" in descriptor) descriptor.writable = true;
-                Object.defineProperty(target, descriptor.key, descriptor);
+        const prototype = Object.getPrototypeOf(object);
+        return prototype === null || prototype === Object.prototype;
+      }
+      pullAt(data, index) {
+        data.splice(index, 1);
+        return data;
+      }
+      extend(object1, object2) {
+        // Copy only own, safe properties into a new object. In particular,
+        // never treat attacker-controlled prototype keys as data or mutate
+        // a caller-owned object while applying an update.
+        const result = {};
+        const blockedKeys = ['__proto__', 'constructor', 'prototype'];
+        [object1, object2].forEach(source => {
+          if (!source) {
+            return;
+          }
+          Object.keys(source).forEach(key => {
+            if (blockedKeys.indexOf(key) === -1) {
+              result[key] = source[key];
             }
-        }
-
-        return function (Constructor, protoProps, staticProps) {
-            if (protoProps) defineProperties(Constructor.prototype, protoProps);
-            if (staticProps) defineProperties(Constructor, staticProps);
-            return Constructor;
-        };
-    }();
-
-    function _possibleConstructorReturn(self, call) {
-        if (!self) {
-            throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
-        }
-
-        return call && (typeof call === "object" || typeof call === "function") ? call : self;
-    }
-
-    function _inherits(subClass, superClass) {
-        if (typeof superClass !== "function" && superClass !== null) {
-            throw new TypeError("Super expression must either be null or a function, not " + typeof superClass);
-        }
-
-        subClass.prototype = Object.create(superClass && superClass.prototype, {
-            constructor: {
-                value: subClass,
-                enumerable: false,
-                writable: true,
-                configurable: true
-            }
+          });
         });
-        if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass;
-    }
-
-    (function (EventEmitter) {
-
-        'use strict';
-
-        /*
-        UTILITIES
-        */
-
-        module.exports = function (_EventEmitter) {
-            _inherits(_class, _EventEmitter);
-
-            function _class(modelData) {
-                _classCallCheck(this, _class);
-
-                var _this = _possibleConstructorReturn(this, (_class.__proto__ || Object.getPrototypeOf(_class)).call(this));
-
-                // used for mediator messaging if in use
-                _this.label = '';
-
-                return _this;
+        return result;
+      }
+      message(messages, data) {
+        if (Array.isArray(messages), data) {
+          let i;
+          for (i = 0; i < messages.length; i++) {
+            this.emit(messages[i], data);
+            if (this.name && this.mediator && this.mediator.emit) {
+              this.mediator.emit(this.label + ':' + this.name + ':' + messages[i], data);
             }
-
-            _createClass(_class, [{
-                key: 'isMap',
-                value: function isMap(object) {
-                    return Object.prototype.toString.call(object) === '[object Map]';
-                }
-            }, {
-                key: 'isFinite',
-                value: function isFinite(number) {
-                    return Number.isFinite(number);
-                }
-            }, {
-                key: 'isPlainObject',
-                value: function isPlainObject(object) {
-                    if (Object.prototype.toString.call(object) !== '[object Object]') {
-                        return false;
-                    }
-                    var prototype = Object.getPrototypeOf(object);
-                    return prototype === null || prototype === Object.prototype;
-                }
-            }, {
-                key: 'pullAt',
-                value: function pullAt(data, index) {
-                    data.splice(index, 1);
-                    return data;
-                }
-            }, {
-                key: 'extend',
-                value: function extend(object1, object2) {
-                    // Copy only own, safe properties into a new object. In particular,
-                    // never treat attacker-controlled prototype keys as data or mutate
-                    // a caller-owned object while applying an update.
-                    var result = {};
-                    var blockedKeys = ['__proto__', 'constructor', 'prototype'];
-
-                    [object1, object2].forEach(function (source) {
-                        if (!source) {
-                            return;
-                        }
-
-                        Object.keys(source).forEach(function (key) {
-                            if (blockedKeys.indexOf(key) === -1) {
-                                result[key] = source[key];
-                            }
-                        });
-                    });
-
-                    return result;
-                }
-            }, {
-                key: 'message',
-                value: function message(messages, data) {
-
-                    if (Array.isArray(messages), data) {
-
-                        var i = void 0;
-                        for (i = 0; i < messages.length; i++) {
-                            this.emit(messages[i], data);
-                            if (this.name && this.mediator && this.mediator.emit) {
-                                this.mediator.emit(this.label + ':' + this.name + ':' + messages[i], data);
-                            }
-                        }
-
-                        return true;
-                    } else {
-
-                        return false;
-                    }
-                }
-            }]);
-
-            return _class;
-        }(EventEmitter);
-    })(_events2.default);
+          }
+          return true;
+        } else {
+          return false;
+        }
+      }
+    };
+  })(_events.default);
 });
