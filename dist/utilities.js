@@ -1,21 +1,19 @@
 (function (global, factory) {
     if (typeof define === "function" && define.amd) {
-        define(['module', 'events', 'lodash'], factory);
+        define(['module', 'events'], factory);
     } else if (typeof exports !== "undefined") {
-        factory(module, require('events'), require('lodash'));
+        factory(module, require('events'));
     } else {
         var mod = {
             exports: {}
         };
-        factory(mod, global.events, global.lodash);
+        factory(mod, global.events);
         global.utilities = mod.exports;
     }
-})(this, function (module, _events, _lodash) {
+})(this, function (module, _events) {
     'use strict';
 
     var _events2 = _interopRequireDefault(_events);
-
-    var _lodash2 = _interopRequireDefault(_lodash);
 
     function _interopRequireDefault(obj) {
         return obj && obj.__esModule ? obj : {
@@ -96,40 +94,50 @@
             _createClass(_class, [{
                 key: 'isMap',
                 value: function isMap(object) {
-                    return _lodash2.default.isMap(object);
+                    return Object.prototype.toString.call(object) === '[object Map]';
                 }
             }, {
                 key: 'isFinite',
                 value: function isFinite(number) {
-                    return _lodash2.default.isFinite(number);
+                    return Number.isFinite(number);
                 }
             }, {
                 key: 'isPlainObject',
                 value: function isPlainObject(object) {
-                    return _lodash2.default.isPlainObject(object);
+                    if (Object.prototype.toString.call(object) !== '[object Object]') {
+                        return false;
+                    }
+                    var prototype = Object.getPrototypeOf(object);
+                    return prototype === null || prototype === Object.prototype;
                 }
             }, {
                 key: 'pullAt',
                 value: function pullAt(data, index) {
-                    var i = void 0;
-                    var newData = new Array();
-                    for (i = 0; i < data.length; i++) {
-                        if (i === index) {
-                            continue;
-                        }
-                        newData.push(data[i]);
-                    }
-                    return newData;
-                }
-            }, {
-                key: 'concat',
-                value: function concat(data, value) {
-                    return _lodash2.default.concat(data, value);
+                    data.splice(index, 1);
+                    return data;
                 }
             }, {
                 key: 'extend',
                 value: function extend(object1, object2) {
-                    return _lodash2.default.extend(object1, object2);
+                    // Copy only own, safe properties into a new object. In particular,
+                    // never treat attacker-controlled prototype keys as data or mutate
+                    // a caller-owned object while applying an update.
+                    var result = {};
+                    var blockedKeys = ['__proto__', 'constructor', 'prototype'];
+
+                    [object1, object2].forEach(function (source) {
+                        if (!source) {
+                            return;
+                        }
+
+                        Object.keys(source).forEach(function (key) {
+                            if (blockedKeys.indexOf(key) === -1) {
+                                result[key] = source[key];
+                            }
+                        });
+                    });
+
+                    return result;
                 }
             }, {
                 key: 'message',
