@@ -1,30 +1,23 @@
 (function (global, factory) {
-    if (typeof define === "function" && define.amd) {
-        define(['module', './collection', './model'], factory);
-    } else if (typeof exports !== "undefined") {
-        factory(module, require('./collection'), require('./model'));
-    } else {
-        var mod = {
-            exports: {}
-        };
-        factory(mod, global.collection, global.model);
-        global.index = mod.exports;
-    }
-})(this, function (module, _collection, _model) {
-    'use strict';
-
-    var _collection2 = _interopRequireDefault(_collection);
-
-    var _model2 = _interopRequireDefault(_model);
-
-    function _interopRequireDefault(obj) {
-        return obj && obj.__esModule ? obj : {
-            default: obj
-        };
-    }
-
-    module.exports = {
-        Model: _model2.default,
-        Collection: _collection2.default
+  if (typeof define === "function" && define.amd) {
+    define(["./collection", "./model"], factory);
+  } else if (typeof exports !== "undefined") {
+    factory(require("./collection"), require("./model"));
+  } else {
+    var mod = {
+      exports: {}
     };
+    factory(global.collection, global.model);
+    global.index = mod.exports;
+  }
+})(typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : this, function (_collection, _model) {
+  "use strict";
+
+  _collection = _interopRequireDefault(_collection);
+  _model = _interopRequireDefault(_model);
+  function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+  module.exports = {
+    Model: _model.default,
+    Collection: _collection.default
+  };
 });
