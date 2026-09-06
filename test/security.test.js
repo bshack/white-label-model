@@ -46,3 +46,22 @@ test('collection object updates reject prototype-pollution keys', function() {
     assert.equal(Object.prototype.hasOwnProperty.call(collection.get(0), '__proto__'), false);
     assert.equal(collection.get(0).name, 'safe');
 });
+
+test('collection appends single values and arrays without replacing its backing array', function() {
+    const collection = new WhiteLabelModel.Collection(['red']);
+    const originalData = collection.get();
+
+    assert.equal(collection.push('green', undefined, true), true);
+    assert.equal(collection.push(['blue', 'yellow'], undefined, true), true);
+    assert.equal(collection.get(), originalData);
+    assert.deepEqual(collection.get(), ['red', 'green', 'blue', 'yellow']);
+});
+
+test('collection deletion updates the backing array in place', function() {
+    const collection = new WhiteLabelModel.Collection(['red', 'green', 'blue']);
+    const originalData = collection.get();
+
+    assert.equal(collection.delete(1, true), true);
+    assert.equal(collection.get(), originalData);
+    assert.deepEqual(collection.get(), ['red', 'blue']);
+});

@@ -1,5 +1,4 @@
 import EventEmitter from 'events';
-import _ from 'lodash';
 
 ((EventEmitter) => {
 
@@ -21,31 +20,24 @@ import _ from 'lodash';
         }
 
         isMap(object) {
-            return _.isMap(object);
+            return Object.prototype.toString.call(object) === '[object Map]';
         }
 
         isFinite(number) {
-            return _.isFinite(number);
+            return Number.isFinite(number);
         }
 
         isPlainObject(object) {
-            return _.isPlainObject(object);
+            if (Object.prototype.toString.call(object) !== '[object Object]') {
+                return false;
+            }
+            const prototype = Object.getPrototypeOf(object);
+            return prototype === null || prototype === Object.prototype;
         }
 
         pullAt(data, index) {
-            let i;
-            let newData = new Array();
-            for (i = 0; i < data.length; i++) {
-                if (i === index) {
-                    continue;
-                }
-                newData.push(data[i]);
-            }
-            return newData;
-        }
-
-        concat(data, value) {
-            return _.concat(data, value);
+            data.splice(index, 1);
+            return data;
         }
 
         extend(object1, object2) {

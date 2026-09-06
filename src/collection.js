@@ -88,7 +88,7 @@ import Utilities from './utilities';
                 }
                 return true;
             } else if (data) {
-                this.set(this.concat(savedData, data), true);
+                savedData.push(...(Array.isArray(data) ? data : [data]));
                 if (!silent) {
                     this.message(['change', 'push'], this.get());
                 }
