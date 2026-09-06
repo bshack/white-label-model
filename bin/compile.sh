@@ -1,2 +1,7 @@
-#!/bin/bash
-../node_modules/babel-cli/bin/babel.js ../src/index.js --out-file ../dist/index.js; ../node_modules/babel-cli/bin/babel.js ../src/utilities.js --out-file ../dist/utilities.js; ../node_modules/babel-cli/bin/babel.js ../src/collection.js --out-file ../dist/collection.js; ../node_modules/babel-cli/bin/babel.js ../src/model.js --out-file ../dist/model.js;
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$project_root"
+
+./node_modules/.bin/babel src --out-dir dist
