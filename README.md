@@ -1,504 +1,204 @@
 # white-label-model
 
-[![Build Status](https://travis-ci.org/bshack/white-label-model.svg?branch=master)](https://travis-ci.org/bshack/white-label-model) [![Coverage Status](https://coveralls.io/repos/github/bshack/white-label-model/badge.svg?branch=master)](https://coveralls.io/github/bshack/white-label-model?branch=master)
+`white-label-model` provides two small event-emitting data containers:
 
-A simple ES6 JS data model that emits events on data change. Offers support for collections of models. Models are for object literals and collections are for arrays and maps.
+- `Model` stores a plain JavaScript object.
+- `Collection` stores an array or a `Map`.
 
-Model and collection events are emitted using Node.js' events module. For more options on how to listen to events please look at the Node.js documentation:
+Both classes emit predictable events when data changes, can relay namespaced events through a mediator, and provide lifecycle hooks for application code.
 
-https://nodejs.org/api/events.html
+## Requirements
 
-## Install
+- Node.js `^22.18.0` or `>=24.11.0` for installation and development
+- Native `Map` support when using map collections
 
-Install the node module:
+## Install and import
 
-```
-npm install white-label-model --save
-```
-
-## Model Usage
-
-white-label-model supports models and collections, this first example is for models only.
-
-### Require
-
-```
-const Model = require('white-label-model').Model;
+```sh
+npm install white-label-model
 ```
 
-### Instantiate
-
-Create a new empty model:
-
-```
-const modelColor = new Model();
+```js
+import {Collection, Model} from 'white-label-model';
 ```
 
-optionally you can also set the model data at instantiation:
+CommonJS is also supported:
 
+```js
+const {Collection, Model} = require('white-label-model');
 ```
-const modelColor = new Model({
-    name: 'red'
+
+## Model quick start
+
+```js
+const profile = new Model({
+    id: 42,
+    name: 'Ada'
 });
+
+profile.on('change', (data) => {
+    console.log('Current profile:', data);
+});
+
+profile.update({name: 'Grace'});
+console.log(profile.get()); // {id: 42, name: 'Grace'}
 ```
 
-## Extend
+### Model methods
 
-extend the Model class for your own needs:
+| Method | Behavior | Events |
+| --- | --- | --- |
+| `get()` | Returns the stored object. | None |
+| `set(data, silent)` | Replaces all model data with a plain object. | `change`, `set` |
+| `update(data, silent)` | Creates a shallow merge of current and new safe own properties. | `change`, `update` |
+| `delete(silent)` | Replaces the data with an empty object. | `change`, `delete` |
+| `initialize()` | Lifecycle hook that returns the model. | None |
+| `destroy()` | Clears data silently and removes all listeners. | None |
 
+Mutation methods return `true` when the input is accepted and `false` when it is not. Pass `true` as the final `silent` argument to change data without emitting events:
+
+```js
+profile.set({id: 42, name: 'Ada'}, true);
+profile.update({name: 'Grace'}, true);
+profile.delete(true);
 ```
-const MyModel = class extends Model {
-    someGreatFeature() {
-        console.log('this is great!');
+
+`update()` blocks the special keys `__proto__`, `constructor`, and `prototype` while merging. The merge is shallow; nested objects are replaced rather than recursively merged.
+
+## Collection quick start
+
+Array collections are the default:
+
+```js
+const colors = new Collection(['red', 'green']);
+
+colors.on('push', (items) => {
+    console.log('Collection now contains:', items);
+});
+
+colors.push('blue');
+console.log(colors.get(1)); // green
+```
+
+Use a `Map` when items need named keys:
+
+```js
+const people = new Collection(new Map([
+    ['ada', new Model({name: 'Ada'})]
+]));
+
+people.push('grace', new Model({name: 'Grace'}));
+console.log(people.get('grace').get()); // {name: 'Grace'}
+```
+
+### Collection methods
+
+| Method | Behavior | Events |
+| --- | --- | --- |
+| `get()` | Returns the complete array or `Map`. | None |
+| `get(index)` | Returns one array item or map value. | None |
+| `set(data, silent)` | Replaces the collection with an array or `Map`. | `change`, `set` |
+| `push(value, placeholder, silent)` | Adds one value or an array of values to an array collection. Use `false` as the placeholder when passing `silent`. | `change`, `push` |
+| `push(key, value, silent)` | Adds one entry to a map collection. | `change`, `push` |
+| `push(map, placeholder, silent)` | Adds every entry from another `Map`. Use `false` as the placeholder when passing `silent`. | `change`, `push` |
+| `update(index, value, silent)` | Updates one item. Plain objects are shallowly merged. | `change`, `update` |
+| `update(collection, placeholder, silent)` | Replaces all data with an array or `Map`. Leave the placeholder undefined when passing `silent`. | `change`, `update` |
+| `delete(index, silent)` | Removes one item. | `change`, `delete` |
+| `delete(false, silent)` | Clears the collection while preserving array/map type. | `change`, `delete` |
+| `destroy()` | Clears data silently and removes all listeners. | None |
+
+Examples:
+
+```js
+const tasks = new Collection([
+    {id: 1, complete: false},
+    {id: 2, complete: false}
+]);
+
+tasks.update(1, {complete: true});
+tasks.delete(0);
+tasks.push({id: 3, complete: false});
+
+// Replace all collection data without emitting an event.
+tasks.update([], undefined, true);
+
+// Add array data without emitting an event.
+tasks.push({id: 4, complete: false}, false, true);
+```
+
+The object returned by `get()` is the stored object, array, or `Map`, not a defensive copy. Treat it as read-only and use mutation methods when you want events to be emitted.
+
+## Events
+
+Every successful non-silent mutation emits both `change` and an operation-specific event:
+
+```js
+profile.on('change', handleAnyChange);
+profile.on('set', handleReplacement);
+profile.on('update', handleUpdate);
+profile.on('delete', handleDeletion);
+
+colors.on('push', handleAddition);
+```
+
+All listeners receive the complete current model or collection data.
+
+Remove a listener with the same callback reference:
+
+```js
+profile.removeListener('change', handleAnyChange);
+```
+
+## Relay events through a mediator
+
+Set both `name` and `mediator` to relay each local event under the pattern `<type>:<name>:<event>`:
+
+```js
+import Mediator from 'white-label-mediator';
+import {Model} from 'white-label-model';
+
+const mediator = new Mediator();
+const session = new Model({authenticated: false});
+
+session.name = 'session';
+session.mediator = mediator;
+
+mediator.on('model:session:update', (data) => {
+    console.log('Session changed:', data);
+});
+
+session.update({authenticated: true});
+```
+
+The model still emits its local `change` and `update` events in addition to the mediator messages.
+
+## Extend a model or collection
+
+```js
+class UserModel extends Model {
+    displayName() {
+        return this.get().name || 'Anonymous';
     }
-};
 
-const myModel = new MyModel();
-
-myModel.someGreatFeature();
-```
-
-### Events
-
-Add change listener to the model:
-
-```
-modelColor.on('change', (data) => {
-    console.log('Model Data Change:', data);
-});
-```
-
-Whenever a model changes it will emit a 'change' event.
-
-### Set
-
-Save some data in the model:
-
-```
-modelColor.set({
-    name: 'red'
-});
-```
-
-This will emit 'change' and 'set' events. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
-
-```
-modelColor.set({
-    name: 'red'
-}, true);
-```
-
-### Get
-
-Retreive the stored model data:
-
-```
-const redColorData = modelColor.get();
-```
-
-### Update
-
-Update the stored model data with new data:
-
-```
-modelColor.update({
-    name: 'blue',
-    isPrimaryColor: true
-});
-```
-
-This extends the existing model data, old properties are overwritten, new properties are added to the model. This will emit 'change' and 'update' events. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
-
-```
-modelColor.update({
-    name: 'blue',
-    isPrimaryColor: true
-}, true);
-```
-
-### Delete
-
-This sets the model data to an empty object:
-
-```
-modelColor.delete();
-```
-
-This will emit 'change' and 'delete' events. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
-
-```
-modelColor.delete(true);
-```
-
-### Destroy
-
-Call this when you are done using the model:
-
-```
-modelColor.destroy();
-```
-
-This will delete all the data and remove all listeners for the model.
-
-
-## Collection Usage
-
-Collections can be either arrays or maps. They will default to arrays unless otherwise set. They can hold models or any other data types.
-
-To support maps you will likely need to use a polyfill in your project such as the babel-polyfill:
-
-http://babeljs.io/docs/usage/polyfill/
-
-### Require
-
-```
-const Model = require('white-label-model').Model;
-const Collection = require('white-label-model').Collection;
-```
-
-### Instantiate
-
-Create a couple new models.
-
-```
-const modelColor1 = new Model({
-    name: 'red'
-});
-const modelColor2 = new Model({
-    name: 'green'
-});
-const modelColor3 = new Model({
-    name: 'blue'
-});
-```
-
-Now create a new collection to hold the models.
-
-If you want your collection to be an array:
-
-```
-const modelColors = new Collection();
-```
-or
-```
-const modelColors = new Collection(new Array());
-```
-
-If you want your collection to be a map:
-
-```
-const modelColors = new Collection(new Map());
-```
-
-Optionally you can also set the collection data at instantiation:
-
-#### array
-
-```
-const modelColors = new Collection([
-    modelColor1,
-    modelColor2,
-    modelColor3
-]);
-```
-
-#### map
-
-```
-const modelColors = new Collection(new Map([
-    ['color1', modelColor1],
-    ['color2', modelColor2],
-    ['color3', modelColor3]
-]));
-```
-
-## Extend
-
-extend the Collection class for your own needs:
-
-```
-const MyCollection = class extends Collection {
-    someGreatFeature() {
-        console.log('this is great!');
+    async serviceGet() {
+        const response = await fetch('/user');
+        this.set(await response.json());
+        return this.get();
     }
-};
+}
 
-const myCollection = new MyCollection();
-
-myCollection.someGreatFeature();
+const user = new UserModel();
 ```
 
-### Events
+`serviceGet`, `servicePatch`, `servicePost`, and `servicePut` are placeholder async methods on both base classes. They resolve to an empty object until an application overrides them; they do not perform network requests by themselves.
 
-Add change listeners to the models and the collection:
+## Development
 
-#### models:
-
-```
-modelColor1.on('change', (data) => {
-    console.log('Model 1 Data Change:', data);
-});
-modelColor2.on('change', (data) => {
-    console.log('Model 2 Data Change:', data);
-});
-modelColor3.on('change', (data) => {
-    console.log('Model 3 Data Change:', data);
-});
+```sh
+npm ci
+npm run build
+npm test
+npm run audit
 ```
 
-#### collection:
-
-```
-modelColors.on('change', (data) => {
-    console.log('Collection Data Change:', data);
-});
-```
-
-Whenever these models or this collection change they will emit a 'change' event.
-
-### Set
-
-Set the collection contents:
-
-#### array
-
-```
-modelColor1.set([
-    modelColor1,
-    modelColor2,
-    modelColor3
-]);
-```
-
-#### map
-
-```
-const modelColors = new Collection(new Map([
-    ['color1', modelColor1],
-    ['color2', modelColor2],
-    ['color3', modelColor3]
-]));
-```
-
-The data must be in an array or map and this will overwrite any existing array data stored completely.
-
-This will emit 'change' and 'set' events.  If you do not what the model to emit any events you can pass in the 'silent' argument like so:
-
-```
-modelColor1.set([
-    modelColor1,
-    modelColor2,
-    modelColor3
-], true);
-```
-
-### Push
-
-Add single items to the end of the stored collection:
-
-#### array
-
-```
-modelColors.push(modelColor1);
-modelColors.push(modelColor2);
-modelColors.push(modelColor3);
-```
-
-#### map
-
-```
-modelColors.push('color1', modelColor1);
-modelColors.push('color2', modelColor2);
-modelColors.push('color3', modelColor3);
-```
-
-or add multiple items to the end of the stored collection:
-
-#### array
-
-```
-modelColor1.push([
-    modelColor1,
-    modelColor2,
-    modelColor3
-]);
-```
-
-#### map
-
-```
-modelColor1.push(new Map([
-    ['color1', modelColor1],
-    ['color2', modelColor2],
-    ['color3', modelColor3]
-]));
-```
-
-This will emit 'change' and 'push' events. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
-
-```
-modelColors.push(modelColor1, false, true);
-```
-
-or
-
-```
-modelColors.push('color1', modelColor1, true);
-```
-
-### Get
-
-This returns then entire collection data:
-
-```
-const allColors = modelColors.get();
-```
-
-This returns only a single item from the collection at the specified index:
-
-#### array
-
-```
-const greenData = modelColors.get(1);
-```
-
-#### map
-
-```
-const greenData = modelColors.get('color2');
-```
-
-### Update
-
-This updates a single item in the collection with new object data at the specified index:
-
-#### array
-
-```
-modelColors.update(1, {
-    isPrimaryColor: true
-});
-```
-
-#### map
-
-```
-modelColors.update('color2', {
-    isPrimaryColor: true
-});
-```
-
-This extends the existing item object data, old properties are overwritten, new properties are added to the object.
-
-or when the item data type is not an object it will simply overwrite completely the old data with new:
-
-#### array
-
-```
-modelColors.update(1, true);
-```
-
-#### map
-
-```
-modelColors.update('color2', true);
-```
-
-This will emit 'change' and 'update' events on the collection and on the item if it is a model.
-
-When you don't pass in an index argument the collection is updated with all new data:
-
-#### array
-
-```
-modelColors.update([
-    new Model({
-        name: 'cyan'
-    }),
-    new Model({
-        name: 'magenta'
-    }),
-    new Model({
-        name: 'yellow'
-    }),
-    new Model({
-        name: 'black'
-    })
-]);
-```
-
-#### map
-
-```
-modelColors.update([
-    ['color1', new Model({
-        name: 'cyan'
-    })],
-    ['color2', new Model({
-        name: 'magenta'
-    })],
-    ['color3', new Model({
-        name: 'yellow'
-    })],
-    ['color4', new Model({
-        name: 'black'
-    })]
-]);
-```
-
-The new data must be an array or map. This will emit 'change' and 'update' events only on the collection. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
-
-```
-modelColors.update(1, {
-    isPrimaryColor: true
-}, true);
-```
-
-### Delete
-
-This deletes a model from the collection at the specified index:
-
-#### array
-
-```
-modelColors.delete(2);
-```
-
-#### map
-
-```
-modelColors.delete('color3');
-```
-
-This sets the collection data to an empty array or map.
-
-```
-modelColors.delete();
-```
-
-It respect the previous data type. For example if it was a map it will set it to an empty map.
-
-This will emit 'change' and 'delete' events. If you do not what the model to emit any events you can pass in the 'silent' argument like so:
-
-```
-modelColors.delete(2, true);
-```
-
-or
-
-```
-modelColors.delete(false, true);
-```
-
-## Interacting with an API
-
-The following methods have been subbed out for working with data from a service as a basic structure. They all return an object by default. You would simply redefined them when extending either the model or collection class.
-
-```
-modelColors.serviceGet();
-modelColors.servicePatch();
-modelColors.servicePost();
-modelColors.servicePut();
-```
-
-These return promises by default.
+The npm package publishes the compiled `dist` directory and this README.
