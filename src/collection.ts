@@ -1,46 +1,64 @@
-"use strict";
 /** @module src/collection */
-const Utilities = require("./utilities");
+import Utilities = require('./utilities');
+
+
+
+
 /** Array or Map storage with the original positional mutation API. */
 class Collection extends Utilities {
-    collectionData = [];
+    collectionData: unknown[] | Map<unknown, unknown> = [];
+
     /**
      * Create an instance with its own state and listener references.
      * @param collectionData - Initial array or Map storage.
      */
-    constructor(collectionData) {
+    constructor(collectionData?: unknown[] | Map<unknown, unknown>) {
+
         super();
+
         // where the data is held for the collection
         if (collectionData && (Array.isArray(collectionData) || this.isMap(collectionData))) {
             this.set(collectionData);
-        }
-        else {
+        } else {
             this.set(new Array());
         }
+
         this.label = 'collection';
+
         // optionally add in a mediator when extended
         this.mediator = false;
+
         // name for this model instance be used in mediator emit. Required on when using a mediator
         this.name = false;
+
     }
+
     /**
      * Start this instance and return it for lifecycle chaining.
      * @returns This instance for chaining.
      */
     initialize() {
+
         return this;
+
     }
+
     /**
      * Release owned state and listeners so the instance can leave the application lifecycle.
      * @returns This instance after cleanup.
      */
     destroy() {
+
         //delete all the data
         this.delete(false, true);
+
         // remove all node events
         this.removeAllListeners();
+
         return this;
+
     }
+
     // the setter
     /**
      * Replace stored data when it has a supported shape; optionally suppress change notifications.
@@ -48,18 +66,20 @@ class Collection extends Utilities {
      * @param silent - Suppress mutation notifications when true.
      * @returns True when data was accepted; false for an unsupported shape.
      */
-    set(data, silent = false) {
+    set(data: unknown, silent = false): boolean {
+
         if (Array.isArray(data) || this.isMap(data)) {
             this.collectionData = data;
             if (!silent) {
                 this.message(['change', 'set'], this.get());
             }
             return true;
-        }
-        else {
+        } else {
             return false;
         }
+
     }
+
     // the pusher
     /**
      * Append array data or insert Map entries, preserving the backing container.
@@ -68,63 +88,68 @@ class Collection extends Utilities {
      * @param silent - Suppress mutation notifications when true.
      * @returns True when data was appended; false when no usable data was supplied.
      */
-    push(key, data, silent = false) {
+    push(key: unknown, data?: unknown, silent = false): boolean {
+
         //get the data
         const savedData = this.get();
+
         // if we are adding one item to a Map
         if (key && data) {
-            savedData.set(key, data);
+            (savedData as Map<unknown, unknown>).set(key, data);
             this.set(savedData, true);
             if (!silent) {
                 this.message(['change', 'push'], this.get());
             }
             return true;
-        }
-        else {
+        } else {
             data = key;
         }
+
         if (this.isMap(data)) {
-            data.forEach(function (value, key) {
-                savedData.set(key, value);
+            data.forEach(function(value, key) {
+                (savedData as Map<unknown, unknown>).set(key, value);
             });
             this.set(savedData, true);
             if (!silent) {
                 this.message(['change', 'push'], this.get());
             }
             return true;
-        }
-        else if (data) {
-            savedData.push(...(Array.isArray(data) ? data : [data]));
+        } else if (data) {
+            (savedData as unknown[]).push(...(Array.isArray(data) ? data : [data]));
             if (!silent) {
                 this.message(['change', 'push'], this.get());
             }
             return true;
-        }
-        else {
+        } else {
             return false;
         }
+
     }
+
+    // the getter
+    get(): unknown[] | Map<unknown, unknown>;
+    get(index: unknown): unknown;
     /**
      * Return the stored data or the requested collection member without cloning it.
      * @param index - Array position or Map key; omission selects the whole collection.
      * @returns The backing data container or the selected member.
      */
-    get(index) {
+    get(index?: unknown): unknown {
         if (index && this.isMap(this.collectionData)) {
             return this.collectionData.get(index);
-        }
-        else if (this.isFinite(index)) {
-            return this.collectionData[index];
-        }
-        else {
+        } else if (this.isFinite(index)) {
+            return (this.collectionData as unknown[])[index];
+        } else {
             return this.collectionData;
         }
     }
+
     /** Recognize model-like collection members without requiring a particular class. */
-    isModel(value) {
+    private isModel(value: unknown): value is {get(): Record<string, unknown>; set(data: unknown): unknown; message(events: string[], data: unknown): unknown} {
         return typeof value === 'object' && value !== null && 'get' in value && typeof value.get === 'function' &&
             'set' in value && typeof value.set === 'function' && 'message' in value && typeof value.message === 'function';
     }
+
     // the updater
     /**
      * Merge object fields or replace a collection member, retaining the existing mutation contract.
@@ -133,17 +158,20 @@ class Collection extends Utilities {
      * @param silent - Suppress mutation notifications when true.
      * @returns True when an update was applied; false when it could not be applied.
      */
-    update(index, updateData, silent = false) {
+    update(index: unknown, updateData?: unknown, silent = false): boolean {
+
         const item = this.get(index);
         // if updating an item in the array or object
         if (index !== undefined &&
             updateData !== undefined &&
             this.get(index) &&
             (Array.isArray(this.get()) || this.isMap(this.get()))) {
+
             // if we are updating a model
             if (this.isPlainObject(updateData) &&
                 this.isModel(item) &&
-                this.isPlainObject(item.get())) {
+                this.isPlainObject(item.get())
+            ) {
                 item.set(this.extend(item.get(), updateData));
                 if (!silent) {
                     item.message(['change', 'update'], item.get());
@@ -151,45 +179,42 @@ class Collection extends Utilities {
                 }
                 return true;
                 // if we are updating a standard object
-            }
-            else if (this.isPlainObject(updateData) && this.isPlainObject(item)) {
+            } else if (this.isPlainObject(updateData) && this.isPlainObject(item)) {
                 const updatedData = this.extend(item, updateData);
                 if (this.isMap(this.collectionData)) {
                     this.collectionData.set(index, updatedData);
-                }
-                else {
-                    this.collectionData[index] = updatedData;
+                } else {
+                    (this.collectionData as unknown[])[index as number] = updatedData;
                 }
                 if (!silent) {
                     this.message(['change', 'update'], this.get());
                 }
                 return true;
-            }
-            else if (updateData) {
+            } else if (updateData) {
                 if (this.isMap(this.collectionData)) {
                     this.collectionData.set(index, updateData);
-                }
-                else {
-                    this.collectionData[index] = updateData;
+                } else {
+                    (this.collectionData as unknown[])[index as number] = updateData;
                 }
                 if (!silent) {
                     this.message(['change', 'update'], this.get());
                 }
                 return true;
             }
-        }
-        else if (Array.isArray(index) || this.isMap(index)) {
+
+        } else if (Array.isArray(index) || this.isMap(index)) {
             this.set(index, true);
             if (!silent) {
                 this.message(['change', 'update'], this.get());
             }
             return true;
-        }
-        else {
+        } else {
             return false;
         }
         return false;
+
     }
+
     // the deleter
     /**
      * Remove stored data and notify subscribers unless silent mode is requested.
@@ -197,32 +222,31 @@ class Collection extends Utilities {
      * @param silent - Suppress mutation notifications when true.
      * @returns True when data was removed or cleared; false for a missing member.
      */
-    delete(index, silent = false) {
+    delete(index?: unknown, silent = false): boolean {
+
         if (index !== undefined && index !== false) {
+
             if (Array.isArray(this.get()) && this.get(index)) {
-                this.set(this.pullAt(this.collectionData, index), true);
+                this.set(this.pullAt(this.collectionData as unknown[], index as number), true);
                 if (!silent) {
                     this.message(['change', 'delete'], this.get());
                 }
                 return true;
-            }
-            else if (this.isMap(this.get()) && this.get(index)) {
-                this.collectionData.delete(index);
+            } else if (this.isMap(this.get()) && this.get(index)) {
+                (this.collectionData as Map<unknown, unknown>).delete(index);
                 if (!silent) {
                     this.message(['change', 'delete'], this.get());
                 }
                 return true;
-            }
-            else {
+            } else {
                 return false;
             }
-        }
-        else {
+
+        } else {
             //keep the same data type
             if (this.isMap(this.get())) {
                 this.set(new Map(), true);
-            }
-            else {
+            } else {
                 this.set(new Array(), true);
             }
             if (!silent) {
@@ -230,7 +254,9 @@ class Collection extends Utilities {
             }
             return true;
         }
+
     }
+
     //sub service request methods
     /**
      * Extension hook for a future GET transport; the default resolves an empty object without I/O.
@@ -241,6 +267,7 @@ class Collection extends Utilities {
             resolve({});
         });
     }
+
     /**
      * Extension hook for a future PATCH transport; the default resolves an empty object without I/O.
      * @returns A promise resolving to an empty object; override to supply a transport.
@@ -250,6 +277,7 @@ class Collection extends Utilities {
             resolve({});
         });
     }
+
     /**
      * Extension hook for a future POST transport; the default resolves an empty object without I/O.
      * @returns A promise resolving to an empty object; override to supply a transport.
@@ -259,6 +287,7 @@ class Collection extends Utilities {
             resolve({});
         });
     }
+
     /**
      * Extension hook for a future PUT transport; the default resolves an empty object without I/O.
      * @returns A promise resolving to an empty object; override to supply a transport.
@@ -268,7 +297,9 @@ class Collection extends Utilities {
             resolve({});
         });
     }
-}
-;
-module.exports = Collection;
-//# sourceMappingURL=collection.js.map
+
+};
+
+
+
+export = Collection;
