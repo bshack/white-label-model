@@ -1,49 +1,68 @@
-"use strict";
 /** @module src/model */
-const Utilities = require("./utilities");
+import Utilities = require('./utilities');
+
+
+
+
 /*
 MODEL
 */
+
 /** Mutable plain-object state with synchronous change notifications. */
-class Model extends Utilities {
-    modelData = {};
+class Model<T extends object = Record<string, unknown>> extends Utilities {
+    modelData: Partial<T> = {};
+
     /**
      * Create an instance with its own state and listener references.
      * @param modelData - Initial plain-object fields.
      */
-    constructor(modelData) {
+    constructor(modelData?: T) {
+
         super();
+
         // where the data is held for the model
         if (modelData && this.isPlainObject(modelData)) {
             this.set(modelData);
-        }
-        else {
+        } else {
             this.set(new Object());
         }
+
         this.label = 'model';
+
         // optionally add in a mediator when extended
         this.mediator = false;
+
         // name for this model instance be used in mediator emit. Required on when using a mediator
         this.name = false;
+
     }
+
     /**
      * Start this instance and return it for lifecycle chaining.
      * @returns This instance for chaining.
      */
     initialize() {
+
         return this;
+
     }
+
     /**
      * Release owned state and listeners so the instance can leave the application lifecycle.
      * @returns This instance after cleanup.
      */
     destroy() {
+
         //delete all the data
         this.delete(true);
+
         // remove all node events
         this.removeAllListeners();
+
         return this;
+
     }
+
     // the setter
     /**
      * Replace stored data when it has a supported shape; optionally suppress change notifications.
@@ -51,26 +70,27 @@ class Model extends Utilities {
      * @param silent - Suppress mutation notifications when true.
      * @returns True when data was accepted; false for an unsupported shape.
      */
-    set(data, silent = false) {
+    set(data: unknown, silent = false): boolean {
         if (data && this.isPlainObject(data)) {
-            this.modelData = data;
+            this.modelData = data as Partial<T>;
             if (!silent) {
                 this.message(['change', 'set'], this.get());
             }
             return true;
-        }
-        else {
+        } else {
             return false;
         }
     }
+
     // the getter
     /**
      * Return the stored data or the requested collection member without cloning it.
      * @returns The backing data container or the selected member.
      */
-    get() {
+    get(): Partial<T> {
         return this.modelData;
     }
+
     // the updater
     /**
      * Merge object fields or replace a collection member, retaining the existing mutation contract.
@@ -78,31 +98,34 @@ class Model extends Utilities {
      * @param silent - Suppress mutation notifications when true.
      * @returns True when an update was applied; false when it could not be applied.
      */
-    update(updateData, silent = false) {
+    update(updateData: Partial<T>, silent = false): boolean {
+
         if (updateData && this.isPlainObject(updateData)) {
-            this.set(this.extend(this.get(), updateData), true);
+            this.set(this.extend(this.get() as Record<string, unknown>, updateData as Record<string, unknown>), true);
             if (!silent) {
                 this.message(['change', 'update'], this.get());
             }
             return true;
-        }
-        else {
+        } else {
             return false;
         }
+
     }
+
     // the deleter
     /**
      * Remove stored data and notify subscribers unless silent mode is requested.
      * @param silent - Suppress mutation notifications when true.
      * @returns True when data was removed or cleared; false for a missing member.
      */
-    delete(silent = false) {
+    delete(silent = false): boolean {
         this.set({}, true);
         if (!silent) {
             this.message(['change', 'delete'], this.get());
         }
         return true;
     }
+
     //sub service request methods
     /**
      * Extension hook for a future GET transport; the default resolves an empty object without I/O.
@@ -113,6 +136,7 @@ class Model extends Utilities {
             resolve({});
         });
     }
+
     /**
      * Extension hook for a future PATCH transport; the default resolves an empty object without I/O.
      * @returns A promise resolving to an empty object; override to supply a transport.
@@ -122,6 +146,7 @@ class Model extends Utilities {
             resolve({});
         });
     }
+
     /**
      * Extension hook for a future POST transport; the default resolves an empty object without I/O.
      * @returns A promise resolving to an empty object; override to supply a transport.
@@ -131,6 +156,7 @@ class Model extends Utilities {
             resolve({});
         });
     }
+
     /**
      * Extension hook for a future PUT transport; the default resolves an empty object without I/O.
      * @returns A promise resolving to an empty object; override to supply a transport.
@@ -140,7 +166,8 @@ class Model extends Utilities {
             resolve({});
         });
     }
-}
-;
-module.exports = Model;
-//# sourceMappingURL=model.js.map
+
+};
+
+
+export = Model;
