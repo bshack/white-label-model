@@ -3,11 +3,12 @@ import Utilities = require('./utilities');
 /** Mutable plain-object state with synchronous change notifications. */
 declare class Model<T extends object = Record<string, unknown>> extends Utilities {
     modelData: Partial<T>;
+    validator?: (data: unknown) => boolean;
     /**
      * Create an instance with its own state and listener references.
      * @param modelData - Initial plain-object fields.
      */
-    constructor(modelData?: T);
+    constructor(modelData?: T, validator?: (data: unknown) => boolean);
     /**
      * Start this instance and return it for lifecycle chaining.
      * @returns This instance for chaining.

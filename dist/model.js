@@ -7,12 +7,14 @@ MODEL
 /** Mutable plain-object state with synchronous change notifications. */
 class Model extends Utilities {
     modelData = {};
+    validator;
     /**
      * Create an instance with its own state and listener references.
      * @param modelData - Initial plain-object fields.
      */
-    constructor(modelData) {
+    constructor(modelData, validator) {
         super();
+        this.validator = validator;
         // where the data is held for the model
         if (modelData && this.isPlainObject(modelData)) {
             this.set(modelData);
@@ -52,7 +54,7 @@ class Model extends Utilities {
      * @returns True when data was accepted; false for an unsupported shape.
      */
     set(data, silent = false) {
-        if (data && this.isPlainObject(data)) {
+        if (data && this.isPlainObject(data) && (!this.validator || this.validator(data))) {
             this.modelData = data;
             if (!silent) {
                 this.message(['change', 'set'], this.get());
@@ -80,7 +82,9 @@ class Model extends Utilities {
      */
     update(updateData, silent = false) {
         if (updateData && this.isPlainObject(updateData)) {
-            this.set(this.extend(this.get(), updateData), true);
+            if (!this.set(this.extend(this.get(), updateData), true)) {
+                return false;
+            }
             if (!silent) {
                 this.message(['change', 'update'], this.get());
             }
