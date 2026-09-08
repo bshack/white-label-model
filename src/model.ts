@@ -11,14 +11,16 @@ MODEL
 /** Mutable plain-object state with synchronous change notifications. */
 class Model<T extends object = Record<string, unknown>> extends Utilities {
     modelData: Partial<T> = {};
+    validator?: (data: unknown) => boolean;
 
     /**
      * Create an instance with its own state and listener references.
      * @param modelData - Initial plain-object fields.
      */
-    constructor(modelData?: T) {
+    constructor(modelData?: T, validator?: (data: unknown) => boolean) {
 
         super();
+        this.validator = validator;
 
         // where the data is held for the model
         if (modelData && this.isPlainObject(modelData)) {
@@ -71,7 +73,7 @@ class Model<T extends object = Record<string, unknown>> extends Utilities {
      * @returns True when data was accepted; false for an unsupported shape.
      */
     set(data: unknown, silent = false): boolean {
-        if (data && this.isPlainObject(data)) {
+        if (data && this.isPlainObject(data) && (!this.validator || this.validator(data))) {
             this.modelData = data as Partial<T>;
             if (!silent) {
                 this.message(['change', 'set'], this.get());
@@ -101,7 +103,9 @@ class Model<T extends object = Record<string, unknown>> extends Utilities {
     update(updateData: Partial<T>, silent = false): boolean {
 
         if (updateData && this.isPlainObject(updateData)) {
-            this.set(this.extend(this.get() as Record<string, unknown>, updateData as Record<string, unknown>), true);
+            if (!this.set(this.extend(this.get() as Record<string, unknown>, updateData as Record<string, unknown>), true)) {
+                return false;
+            }
             if (!silent) {
                 this.message(['change', 'update'], this.get());
             }

@@ -227,6 +227,10 @@ This is a major release because the distribution is now CommonJS emitted by Type
 
 ### Verification and coverage
 
+## Tested compatibility
+
+Version 3.1 is tested with mediator 3.x, view 4.x, and router 4.x. The packages do not require one another at runtime.
+
 ```sh
 npm ci --ignore-scripts
 npm run typecheck
@@ -240,3 +244,15 @@ npm pack --dry-run
 Tests exercise the compiled JavaScript interface used by downstream callers. Coverage is an execution metric, not proof that all possible inputs or external integrations are correct.
 
 To undo this migration, revert its commit and run `npm ci` from the restored lockfile. No npm release, database migration, or production deployment is performed by these development changes.
+### Validate data at runtime
+
+Pass an optional validator when state can originate outside TypeScript:
+
+```ts
+const user = new Model({name: 'Ada'}, value =>
+    typeof value === 'object' && value !== null &&
+    typeof (value as {name?: unknown}).name === 'string'
+);
+```
+
+The validator runs for construction, `set()`, and merged `update()` data. Invalid mutations return `false` and leave existing state unchanged.

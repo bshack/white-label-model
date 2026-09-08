@@ -19,6 +19,15 @@ test('model updates preserve normal data', function() {
     });
 });
 
+test('model validation rejects invalid initial, replacement, and merged data', function() {
+    const valid = value => Boolean(value && typeof value.name === 'string');
+    const model = new WhiteLabelModel.Model({name: 'Ada'}, valid);
+    assert.equal(model.set({name: 42}), false);
+    assert.equal(model.update({name: 42}), false);
+    assert.deepEqual(model.get(), {name: 'Ada'});
+    assert.deepEqual(new WhiteLabelModel.Model({name: 42}, valid).get(), {});
+});
+
 test('model updates reject prototype-pollution keys', function() {
     const model = new WhiteLabelModel.Model({
         name: 'safe'
