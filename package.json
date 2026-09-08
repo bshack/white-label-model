@@ -24,7 +24,6 @@
   "contributors": [
     {
       "name": "Bill Shackelford",
-      "email": "bshackelford@gmail.com",
       "url": "https://github.com/bshack"
     }
   ],
@@ -44,7 +43,6 @@
   },
   "author": {
     "name": "Bill Shackelford",
-    "email": "bshackelford@gmail.com",
     "url": "https://github.com/bshack"
   },
   "license": "MIT",
