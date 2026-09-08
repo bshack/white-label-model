@@ -7,6 +7,8 @@
 
 Both classes emit predictable events when data changes, can relay namespaced events through a mediator, and provide lifecycle hooks for application code.
 
+The package has no DOM or generated HTML, so WCAG and search indexing are application responsibilities. When model state controls an interface, expose changes through semantic controls and appropriate status announcements, keep keyboard and pointer experiences equivalent, and avoid hiding primary public content behind client-only state.
+
 ## Requirements
 
 - Node.js `^22.18.0` or `>=24.11.0` for installation and development
