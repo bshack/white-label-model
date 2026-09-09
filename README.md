@@ -194,6 +194,10 @@ const user = new UserModel();
 
 `serviceGet`, `servicePatch`, `servicePost`, and `servicePut` are placeholder async methods on both base classes. They resolve to an empty object until an application overrides them; they do not perform network requests by themselves.
 
+## Event backend compatibility
+
+The test suite also loads the npm browser implementation explicitly and checks it against the same EventEmitter contract as Node. See [the compatibility contract and replacement assessment](https://github.com/bshack/white-label-model/blob/master/docs/events-compatibility.md) for covered behavior and limitations. These checks run under Node and do not replace real-browser integration testing.
+
 ## Development
 
 Tests live in `test/*.test.js` and use Node's built-in `node:test` runner, strict assertions, and native mocks. Run `npm test` for the build, consumer type checks, and full suite; `npm run coverage` retains the existing c8 coverage gate. After building, run `node --test test/model.test.js` for the converted suite alone.
