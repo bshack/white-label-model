@@ -1,5 +1,5 @@
 /** @module src/utilities */
-import EventEmitter from 'events';
+import EventEmitter = require('./event-emitter');
 /** Shared type guards, safe merges, and namespaced model events. */
 declare class Utilities extends EventEmitter {
     label: string;

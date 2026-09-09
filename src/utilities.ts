@@ -1,5 +1,5 @@
 /** @module src/utilities */
-import EventEmitter from 'events';
+import EventEmitter = require('./event-emitter');
 
 
 

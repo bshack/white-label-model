@@ -1,14 +1,11 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 /** @module src/utilities */
-const events_1 = __importDefault(require("events"));
+const EventEmitter = require("./event-emitter");
 /*
 UTILITIES
 */
 /** Shared type guards, safe merges, and namespaced model events. */
-class Utilities extends events_1.default {
+class Utilities extends EventEmitter {
     label = '';
     name = false;
     mediator = false;
