@@ -262,3 +262,7 @@ const user = new Model({name: 'Ada'}, value =>
 ```
 
 The validator runs for construction, `set()`, and merged `update()` data. Invalid mutations return `false` and leave existing state unchanged.
+
+## Unreleased review fixes
+
+`delete()` and `destroy()` clear the model's own state even when its validator rejects an empty object. Previously returned object references are not erased. Collection updates of nested models request a silent child update, then publish the collection's normal notifications once. An explicit `false` from the child setter rejects the update; a void return remains supported. Silent collection updates emit no notifications. Array appends preserve the backing array and handle large batches without spread-argument limits, including self-appends.

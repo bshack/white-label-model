@@ -115,7 +115,12 @@ class Collection extends Utilities {
             }
             return true;
         } else if (data) {
-            (savedData as unknown[]).push(...(Array.isArray(data) ? data : [data]));
+            const additions = Array.isArray(data) ? data : [data];
+            // Capture the length so appending the collection to itself terminates.
+            const length = additions.length;
+            for (let index = 0; index < length; index++) {
+                (savedData as unknown[]).push(additions[index]);
+            }
             if (!silent) {
                 this.message(['change', 'push'], this.get());
             }
@@ -145,7 +150,7 @@ class Collection extends Utilities {
     }
 
     /** Recognize model-like collection members without requiring a particular class. */
-    private isModel(value: unknown): value is {get(): Record<string, unknown>; set(data: unknown): unknown; message(events: string[], data: unknown): unknown} {
+    private isModel(value: unknown): value is {get(): Record<string, unknown>; set(data: unknown, silent?: boolean): unknown; message(events: string[], data: unknown): unknown} {
         return typeof value === 'object' && value !== null && 'get' in value && typeof value.get === 'function' &&
             'set' in value && typeof value.set === 'function' && 'message' in value && typeof value.message === 'function';
     }
@@ -172,7 +177,9 @@ class Collection extends Utilities {
                 this.isModel(item) &&
                 this.isPlainObject(item.get())
             ) {
-                item.set(this.extend(item.get(), updateData));
+                if (item.set(this.extend(item.get(), updateData), true) === false) {
+                    return false;
+                }
                 if (!silent) {
                     item.message(['change', 'update'], item.get());
                     this.message(['change', 'update'], this.get());

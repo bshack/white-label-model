@@ -123,7 +123,8 @@ class Model<T extends object = Record<string, unknown>> extends Utilities {
      * @returns True when data was removed or cleared; false for a missing member.
      */
     delete(silent = false): boolean {
-        this.set({}, true);
+        // Clearing owned state must not be rejected by an acceptance validator.
+        this.modelData = {};
         if (!silent) {
             this.message(['change', 'delete'], this.get());
         }
