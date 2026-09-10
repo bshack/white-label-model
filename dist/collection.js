@@ -94,7 +94,12 @@ class Collection extends Utilities {
             return true;
         }
         else if (data) {
-            savedData.push(...(Array.isArray(data) ? data : [data]));
+            const additions = Array.isArray(data) ? data : [data];
+            // Capture the length so appending the collection to itself terminates.
+            const length = additions.length;
+            for (let index = 0; index < length; index++) {
+                savedData.push(additions[index]);
+            }
             if (!silent) {
                 this.message(['change', 'push'], this.get());
             }
@@ -144,7 +149,9 @@ class Collection extends Utilities {
             if (this.isPlainObject(updateData) &&
                 this.isModel(item) &&
                 this.isPlainObject(item.get())) {
-                item.set(this.extend(item.get(), updateData));
+                if (item.set(this.extend(item.get(), updateData), true) === false) {
+                    return false;
+                }
                 if (!silent) {
                     item.message(['change', 'update'], item.get());
                     this.message(['change', 'update'], this.get());
