@@ -82,12 +82,13 @@ test('push respects backing type while preserving legacy silent placeholders', (
     let arrayChanges = 0;
     array.on('change', () => arrayChanges++);
     assert.equal(array.push(0), true);
-    assert.deepEqual(array.get(), [0]);
+    assert.equal(array.push(null), true);
+    assert.deepEqual(array.get(), [0, null]);
     assert.equal(array.push(['a', 'b'], false, true), true);
-    assert.deepEqual(array.get(), [0, 'a', 'b']);
-    assert.equal(arrayChanges, 1);
+    assert.deepEqual(array.get(), [0, null, 'a', 'b']);
+    assert.equal(arrayChanges, 2);
     assert.equal(array.push('key', 'value'), false);
-    assert.deepEqual(array.get(), [0, 'a', 'b']);
+    assert.deepEqual(array.get(), [0, null, 'a', 'b']);
 
     const map = new Collection(new Map());
     let mapChanges = 0;
