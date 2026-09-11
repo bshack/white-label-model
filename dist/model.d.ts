@@ -3,7 +3,7 @@ import Utilities = require('./utilities');
 /** Mutable plain-object state with synchronous change notifications. */
 declare class Model<T extends object = Record<string, unknown>> extends Utilities {
     modelData: Partial<T>;
-    validator?: (data: unknown) => boolean;
+    validator: ((data: unknown) => boolean) | undefined;
     /**
      * Create an instance with its own state and listener references.
      * @param modelData - Initial plain-object fields.

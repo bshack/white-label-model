@@ -90,11 +90,10 @@ class Utilities extends events_1.default {
      */
     message(messages, data) {
         if (data) {
-            let i;
-            for (i = 0; i < messages.length; i++) {
-                this.emit(messages[i], data);
+            for (const message of messages) {
+                this.emit(message, data);
                 if (this.name && this.mediator && this.mediator.emit) {
-                    this.mediator.emit(this.label + ':' + this.name + ':' + messages[i], data);
+                    this.mediator.emit(this.label + ':' + this.name + ':' + message, data);
                 }
             }
             return true;

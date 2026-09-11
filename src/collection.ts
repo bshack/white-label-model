@@ -95,13 +95,13 @@ class Collection extends Utilities {
                     return false;
                 }
                 key.forEach((value, mapKey) => savedData.set(mapKey, value));
-                if (dataOrSilent !== true) this.message(['change', 'push'], this.get());
+                if (dataOrSilent !== true) {this.message(['change', 'push'], this.get());}
                 return true;
             }
 
-            if (arguments.length < 2) return false;
+            if (arguments.length < 2) {return false;}
             savedData.set(key, dataOrSilent);
-            if (!silent) this.message(['change', 'push'], this.get());
+            if (!silent) {this.message(['change', 'push'], this.get());}
             return true;
         }
 
@@ -113,8 +113,8 @@ class Collection extends Utilities {
 
         const additions = Array.isArray(key) ? key : [key];
         const length = additions.length;
-        for (let index = 0; index < length; index++) savedData.push(additions[index]);
-        if (dataOrSilent !== true) this.message(['change', 'push'], this.get());
+        for (let index = 0; index < length; index++) {savedData.push(additions[index]);}
+        if (dataOrSilent !== true) {this.message(['change', 'push'], this.get());}
         return true;
 
     }
@@ -149,16 +149,16 @@ class Collection extends Utilities {
 
         const collection = this.get();
         if (index === undefined || updateData === undefined ||
-            (!Array.isArray(collection) && !this.isMap(collection))) return false;
+            (!Array.isArray(collection) && !this.isMap(collection))) {return false;}
 
         const hasItem = this.isMap(collection)
             ? collection.has(index)
             : Number.isInteger(index) && (index as number) >= 0 && (index as number) < collection.length;
-        if (!hasItem) return false;
+        if (!hasItem) {return false;}
 
         const item = this.get(index);
         if (this.isPlainObject(updateData) && this.isModel(item) && this.isPlainObject(item.get())) {
-            if (item.set(this.extend(item.get(), updateData), true) !== true) return false;
+            if (item.set(this.extend(item.get(), updateData), true) !== true) {return false;}
             if (!silent) {
                 item.message(['change', 'update'], item.get());
                 this.message(['change', 'update'], this.get());
@@ -169,9 +169,9 @@ class Collection extends Utilities {
         const value = this.isPlainObject(updateData) && this.isPlainObject(item)
             ? this.extend(item, updateData)
             : updateData;
-        if (this.isMap(this.collectionData)) this.collectionData.set(index, value);
-        else (this.collectionData as unknown[])[index as number] = value;
-        if (!silent) this.message(['change', 'update'], this.get());
+        if (this.isMap(this.collectionData)) {this.collectionData.set(index, value);}
+        else {(this.collectionData as unknown[])[index as number] = value;}
+        if (!silent) {this.message(['change', 'update'], this.get());}
         return true;
 
     }
@@ -180,22 +180,22 @@ class Collection extends Utilities {
     /** Clear all members while preserving the backing collection type. */
     clear(silent = false): boolean {
         this.collectionData = this.isMap(this.collectionData) ? new Map() : [];
-        if (!silent) this.message(['change', 'delete'], this.get());
+        if (!silent) {this.message(['change', 'delete'], this.get());}
         return true;
     }
 
     /** Remove one member by array index or Map key. */
     delete(index: unknown, silent = false): boolean {
         if (Array.isArray(this.collectionData)) {
-            if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= this.collectionData.length) return false;
+            if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= this.collectionData.length) {return false;}
             this.pullAt(this.collectionData, index as number);
         } else if (this.isMap(this.collectionData)) {
-            if (!this.collectionData.has(index)) return false;
+            if (!this.collectionData.has(index)) {return false;}
             this.collectionData.delete(index);
         } else {
             return false;
         }
-        if (!silent) this.message(['change', 'delete'], this.get());
+        if (!silent) {this.message(['change', 'delete'], this.get());}
         return true;
     }
 
