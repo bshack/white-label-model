@@ -14,6 +14,14 @@ The package has no DOM or generated HTML, so WCAG and search indexing are applic
 - Node.js `^22.18.0` or `>=24.11.0` for installation and development
 - Native `Map` support when using map collections
 
+## Versioning policy
+
+Backward compatibility is not maintained through placeholder arguments, sentinel values, deprecated overloads, or permissive legacy return contracts. Breaking public API changes are communicated with a Semantic Versioning major release and migration notes.
+
+### Version 4 migration
+
+Array `push` now uses `push(valueOrValues, silent?)`; bulk Map `push` uses `push(map, silent?)`. The legacy `false` placeholder forms are rejected. Whole-collection replacement uses `set()` rather than the former `update(collection, placeholder, silent)` overload. Clearing uses `clear(silent?)`; `delete()` now always removes one member, so `false` is a valid Map key. Model-like nested setters must return `true` to accept updates. No compatibility shims are retained.
+
 ## Install and import
 
 ```sh
@@ -100,13 +108,12 @@ console.log(people.get('grace').get()); // {name: 'Grace'}
 | `get()` | Returns the complete array or `Map`. | None |
 | `get(index)` | Returns one array item or map value. | None |
 | `set(data, silent)` | Replaces the collection with an array or `Map`. | `change`, `set` |
-| `push(value, placeholder, silent)` | Adds one value or an array of values to an array collection. Use `false` as the placeholder when passing `silent`. | `change`, `push` |
+| `push(value, silent)` | Adds one value or an array of values to an array collection. | `change`, `push` |
 | `push(key, value, silent)` | Adds one entry to a map collection. | `change`, `push` |
-| `push(map, placeholder, silent)` | Adds every entry from another `Map`. Use `false` as the placeholder when passing `silent`. | `change`, `push` |
+| `push(map, silent)` | Adds every entry from another `Map`. | `change`, `push` |
 | `update(index, value, silent)` | Updates one item. Plain objects are shallowly merged. | `change`, `update` |
-| `update(collection, placeholder, silent)` | Replaces all data with an array or `Map`. Leave the placeholder undefined when passing `silent`. | `change`, `update` |
 | `delete(index, silent)` | Removes one item. | `change`, `delete` |
-| `delete(false, silent)` | Clears the collection while preserving array/map type. | `change`, `delete` |
+| `clear(silent)` | Clears the collection while preserving array/map type. | `change`, `delete` |
 | `destroy()` | Clears data silently and removes all listeners. | None |
 
 Examples:
@@ -122,10 +129,10 @@ tasks.delete(0);
 tasks.push({id: 3, complete: false});
 
 // Replace all collection data without emitting an event.
-tasks.update([], undefined, true);
+tasks.set([], true);
 
 // Add array data without emitting an event.
-tasks.push({id: 4, complete: false}, false, true);
+tasks.push({id: 4, complete: false}, true);
 ```
 
 The object returned by `get()` is the stored object, array, or `Map`, not a defensive copy. Treat it as read-only and use mutation methods when you want events to be emitted.
@@ -227,7 +234,7 @@ const name: string | undefined = profile.get().name;
 const profiles = new Collection([profile]);
 ```
 
-`Model<T>` describes the object fields. Runtime validation remains necessary for untrusted JSON: TypeScript does not sanitize incoming data. Collections preserve the existing array/Map API and expose unknown members until callers narrow them. `serviceGet`, `servicePost`, `servicePut`, and `servicePatch` are extension hooks that resolve an empty object; they do not perform HTTP requests.
+`Model<T>` describes the object fields. Runtime validation remains necessary for untrusted JSON: TypeScript does not sanitize incoming data. Collections expose unknown members until callers narrow them. `serviceGet`, `servicePost`, `servicePut`, and `servicePatch` are extension hooks that resolve an empty object; they do not perform HTTP requests.
 
 This is a major release because the distribution is now CommonJS emitted by TypeScript, replacing the previous UMD wrapper. CommonJS `require` and the documented ESM imports remain supported. Direct AMD loading or browser script tags that depended on UMD globals must migrate to a browser bundler. Edit `src/*.ts`, then run `npm run build`; do not edit generated `dist` files. The obsolete Babel build dependencies have been removed.
 
@@ -265,4 +272,4 @@ The validator runs for construction, `set()`, and merged `update()` data. Invali
 
 ## Unreleased review fixes
 
-`delete()` and `destroy()` clear the model's own state even when its validator rejects an empty object. Previously returned object references are not erased. Collection updates of nested models request a silent child update, then publish the collection's normal notifications once. An explicit `false` from the child setter rejects the update; a void return remains supported. Silent collection updates emit no notifications. Array appends preserve the backing array and handle large batches without spread-argument limits, including self-appends.
+`delete()` and `destroy()` clear the model's own state even when its validator rejects an empty object. Previously returned object references are not erased. Collection updates of nested models request a silent child update, then publish the collection's normal notifications once. Nested model-like setters must return `true` to accept an update; `false` or `undefined` rejects it. Silent collection updates emit no notifications. Array appends preserve the backing array and handle large batches without spread-argument limits, including self-appends.

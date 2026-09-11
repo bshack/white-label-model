@@ -519,7 +519,7 @@ describe("A Collection array", function() {
         let pushReturns = modelColors.push([
             modelColor2,
             modelColor3
-        ], false, true);
+        ], true);
         assert.deepEqual(modelColors.collectionData[2].modelData, {
             name: 'blue'
         });
@@ -550,11 +550,11 @@ describe("A Collection array", function() {
     it("will save data in the collection using push and will not emit push event with silent argument passed in", function() {
         callback = mock.fn();
         modelColors.on('push', callback);
-        modelColors.push(modelColor1, false, true);
+        modelColors.push(modelColor1, true);
         let pushReturns = modelColors.push([
             modelColor2,
             modelColor3
-        ], false, true);
+        ], true);
         assert.equal(callback.mock.callCount(), 0);
     });
     it("will save data in the collection using push and emit change event", function() {
@@ -639,7 +639,7 @@ describe("A Collection array", function() {
     });
     it("will update model data in the collection using update with an array of models", function() {
         modelColors.push(modelColor1);
-        let updateReturns = modelColors.update([
+        let updateReturns = modelColors.set([
             new Model({
                 name: 'cyan'
             }),
@@ -662,7 +662,7 @@ describe("A Collection array", function() {
         assert.deepEqual(updateReturns, true);
     });
     it("will not update all model data in the collection when the argument is not an array", function() {
-        modelColors.update([
+        modelColors.set([
             new Model({
                 name: 'cyan'
             }),
@@ -713,7 +713,7 @@ describe("A Collection array", function() {
         assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
     });
     it("will remove model data from the the collection using delete at the specified index", function() {
-        modelColors.update([
+        modelColors.set([
             new Model({
                 name: 'cyan'
             }),
@@ -735,7 +735,7 @@ describe("A Collection array", function() {
         assert.deepEqual(deleteReturns, true);
     });
     it("will not remove model data from the the collection using delete at the specified index when that index does not exist", function() {
-        modelColors.update([
+        modelColors.set([
             new Model({
                 name: 'cyan'
             }),
@@ -760,7 +760,7 @@ describe("A Collection array", function() {
         modelColors.push({
             name: 'red'
         });
-        let deleteReturns = modelColors.delete();
+        let deleteReturns = modelColors.clear();
         assert.ok(Array.isArray(modelColors.get()));
         assert.deepEqual(modelColors.get().length, 0);
         assert.deepEqual(deleteReturns, true);
@@ -769,7 +769,7 @@ describe("A Collection array", function() {
         modelColors.push({
             name: 'red'
         });
-        let deleteReturns = modelColors.delete(false, true);
+        let deleteReturns = modelColors.clear(true);
         assert.ok(Array.isArray(modelColors.get()));
         assert.deepEqual(modelColors.get().length, 0);
         assert.deepEqual(deleteReturns, true);
@@ -780,7 +780,7 @@ describe("A Collection array", function() {
         let deleteReturns = modelColors.push({
             name: 'red'
         });
-        modelColors.delete();
+        modelColors.clear();
         assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
     });
     it("will remove data in the collection using delete and not emit delete event when passing silent argument", function() {
@@ -789,7 +789,7 @@ describe("A Collection array", function() {
         let deleteReturns = modelColors.push({
             name: 'red'
         });
-        modelColors.delete(false, true);
+        modelColors.clear(true);
         assert.equal(callback.mock.callCount(), 0);
     });
     it("will remove data in the collection using delete and emit change event", function() {
@@ -798,7 +798,7 @@ describe("A Collection array", function() {
         let deleteReturns = modelColors.push({
             name: 'red'
         });
-        modelColors.delete();
+        modelColors.clear();
         assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
     });
     it("will add data to the model using push and emit push event with the mediator", function() {
@@ -887,7 +887,7 @@ describe("A Collection array", function() {
         };
         const mediatorCollectionTest = new MediatorCollectionTest();
         mediatorCollectionTest.push(modelColor1);
-        mediatorCollectionTest.delete();
+        mediatorCollectionTest.clear();
         assert.ok(mediator.emit.mock.calls.some(call =>
             call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:delete' && Array.isArray(call.arguments[1])));
         assert.ok(mediator.emit.mock.calls.some(call =>
@@ -910,7 +910,7 @@ describe("A Collection array", function() {
         };
         const mediatorCollectionTest = new MediatorCollectionTest();
         mediatorCollectionTest.push(modelColor1);
-        mediatorCollectionTest.delete();
+        mediatorCollectionTest.clear();
         assert.ok(mediator.emit.mock.calls.some(call =>
             call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:delete' && Array.isArray(call.arguments[1])));
         assert.ok(mediator.emit.mock.calls.some(call =>
@@ -1108,7 +1108,7 @@ describe("A Collection map", function() {
             ['color2', modelColor2],
             ['color3', modelColor3]
         ]));
-        let updateReturns = modelColors.update(new Map([
+        let updateReturns = modelColors.set(new Map([
             ['color1', modelColor3],
             ['color2', modelColor2],
             ['color3', modelColor1]
@@ -1166,7 +1166,7 @@ describe("A Collection map", function() {
             ['color2', modelColor2],
             ['color3', modelColor3]
         ]));
-        let deleteReturns = modelColors.delete();
+        let deleteReturns = modelColors.clear();
         assert.ok(modelColors.get() instanceof Map);
         assert.deepEqual(modelColors.get().size, 0);
         assert.deepEqual(deleteReturns, true);
@@ -1179,7 +1179,7 @@ describe("A Collection map", function() {
             ['color2', modelColor2],
             ['color3', modelColor3]
         ]));
-        modelColors.delete();
+        modelColors.clear();
         assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Map));
     });
     it("will remove data in the collection using delete and emit change event", function() {
@@ -1190,7 +1190,7 @@ describe("A Collection map", function() {
             ['color2', modelColor2],
             ['color3', modelColor3]
         ]));
-        modelColors.delete();
+        modelColors.clear();
         assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Map));
     });
 });
