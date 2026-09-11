@@ -84,7 +84,7 @@ class Collection extends Utilities {
     /**
      * Append array data or insert Map entries, preserving the backing container.
      * @param key - Map key or array data, according to the legacy positional API.
-     * @param data - Data supplied by the caller; validation follows the method contract.
+     * @param data - Map value, or the legacy false placeholder used before the silent argument.
      * @param silent - Suppress mutation notifications when true.
      * @returns True when data was appended; false when no usable data was supplied.
      */
@@ -93,7 +93,8 @@ class Collection extends Utilities {
         const savedData = this.get();
 
         if (this.isMap(savedData)) {
-            if (this.isMap(key) && data === undefined) {
+            // Preserve the legacy push(map, false, silent) overload as well as push(map).
+            if (this.isMap(key) && (data === undefined || data === false)) {
                 key.forEach(function(value, mapKey) {
                     savedData.set(mapKey, value);
                 });
@@ -114,7 +115,8 @@ class Collection extends Utilities {
             return false;
         }
 
-        if (data !== undefined || this.isMap(key) || key === undefined) {
+        // Array callers historically pass false as a placeholder before the silent flag.
+        if ((data !== undefined && data !== false) || this.isMap(key) || key === undefined) {
             return false;
         }
 
