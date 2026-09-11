@@ -22,6 +22,21 @@ jobs:
           node-version: 24.21.0
           cache: npm
       - run: npm install --ignore-scripts
+      - name: Fix strict TypeScript findings
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          let model = fs.readFileSync('src/model.ts', 'utf8');
+          model = model.replace('    validator?: (data: unknown) => boolean;', '    validator: ((data: unknown) => boolean) | undefined;');
+          fs.writeFileSync('src/model.ts', model);
+          let utilities = fs.readFileSync('src/utilities.ts', 'utf8');
+          utilities = utilities.replace(
+            /            let i;\n            for \(i = 0; i < messages\.length; i\+\+\) \{\n                this\.emit\(messages\[i\], data\);\n                if \(this\.name && this\.mediator && this\.mediator\.emit\) \{\n                    this\.mediator\.emit\(this\.label \+ ':' \+ this\.name \+ ':' \+ messages\[i\], data\);\n                \}\n            \}/,
+            `            for (const message of messages) {\n                this.emit(message, data);\n                if (this.name && this.mediator && this.mediator.emit) {\n                    this.mediator.emit(this.label + ':' + this.name + ':' + message, data);\n                }\n            }`,
+          );
+          fs.writeFileSync('src/utilities.ts', utilities);
+          NODE
       - run: npm run lint:fix
       - run: npm run lint
       - run: npm run typecheck
@@ -36,5 +51,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "Regenerate lockfile and verify modernization"
+          git diff --cached --quiet || git commit -m "Complete project modernization"
           git push
