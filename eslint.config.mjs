@@ -1,15 +1,24 @@
+import babelParser from '@babel/eslint-parser';
 import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default [
   {
     ignores: ['dist/**', 'coverage/**', 'node_modules/**'],
   },
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
   {
     files: ['src/**/*.ts'],
+    languageOptions: {
+      parser: babelParser,
+      parserOptions: {
+        requireConfigFile: false,
+        sourceType: 'unambiguous',
+        babelOptions: {
+          presets: ['@babel/preset-typescript'],
+        },
+      },
+    },
     rules: {
+      ...js.configs.recommended.rules,
       curly: ['error', 'all'],
       eqeqeq: ['error', 'always'],
       'no-eval': 'error',
@@ -17,10 +26,6 @@ export default tseslint.config(
       'no-new-wrappers': 'error',
       'no-var': 'error',
       'prefer-const': 'error',
-      '@typescript-eslint/consistent-type-imports': [
-        'error',
-        {prefer: 'type-imports'},
-      ],
     },
   },
-);
+];
