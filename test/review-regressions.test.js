@@ -55,3 +55,39 @@ test('large, sparse and self appends preserve array identity and one notificatio
     self.push(new Array(2));
     assert.deepEqual(self.get().slice(-2), [undefined, undefined]);
 });
+
+test('collection mutations support falsey values and Map keys', () => {
+    const array = new Collection([0, false, '', null]);
+    assert.equal(array.get(0), 0);
+    assert.equal(array.update(0, false), true);
+    assert.equal(array.get(0), false);
+    assert.equal(array.update(1, 0), true);
+    assert.equal(array.get(1), 0);
+    assert.equal(array.update(2, ''), true);
+    assert.equal(array.delete(0), true);
+    assert.deepEqual(array.get(), [0, '', null]);
+
+    const map = new Collection(new Map([[0, false], ['', 0]]));
+    assert.equal(map.get(0), false);
+    assert.equal(map.get(''), 0);
+    assert.equal(map.update(0, 0), true);
+    assert.equal(map.push(false, ''), true);
+    assert.equal(map.get(false), '');
+    assert.equal(map.delete(''), true);
+    assert.equal(map.get().has(''), false);
+});
+
+test('push respects the backing collection type', () => {
+    const array = new Collection([]);
+    assert.equal(array.push(0), true);
+    assert.deepEqual(array.get(), [0]);
+    assert.equal(array.push('key', 'value'), false);
+    assert.deepEqual(array.get(), [0]);
+
+    const map = new Collection(new Map());
+    assert.equal(map.push(0, false), true);
+    assert.equal(map.get(0), false);
+    assert.equal(map.push(new Map([['a', 1], ['b', 2]])), true);
+    assert.deepEqual(Array.from(map.get().entries()), [[0, false], ['a', 1], ['b', 2]]);
+    assert.equal(map.push('value-only'), false);
+});
