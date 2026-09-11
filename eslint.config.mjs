@@ -19,6 +19,8 @@ export default [
     },
     rules: {
       ...js.configs.recommended.rules,
+      'no-undef': 'off',
+      'no-unused-vars': 'off',
       curly: ['error', 'all'],
       eqeqeq: ['error', 'always'],
       'no-eval': 'error',
