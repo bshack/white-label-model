@@ -64,50 +64,46 @@ class Collection extends Utilities {
     /**
      * Append array data or insert Map entries, preserving the backing container.
      * @param key - Map key or array data, according to the legacy positional API.
-     * @param data - Data supplied by the caller; validation follows the method contract.
+     * @param data - Map value, or the legacy false placeholder used before the silent argument.
      * @param silent - Suppress mutation notifications when true.
      * @returns True when data was appended; false when no usable data was supplied.
      */
     push(key, data, silent = false) {
-        //get the data
         const savedData = this.get();
-        // if we are adding one item to a Map
-        if (key && data) {
-            savedData.set(key, data);
-            this.set(savedData, true);
-            if (!silent) {
-                this.message(['change', 'push'], this.get());
+        if (this.isMap(savedData)) {
+            // Preserve the legacy push(map, false, silent) overload as well as push(map).
+            if (this.isMap(key) && (data === undefined || data === false)) {
+                key.forEach(function (value, mapKey) {
+                    savedData.set(mapKey, value);
+                });
+                if (!silent) {
+                    this.message(['change', 'push'], this.get());
+                }
+                return true;
             }
-            return true;
-        }
-        else {
-            data = key;
-        }
-        if (this.isMap(data)) {
-            data.forEach(function (value, key) {
-                savedData.set(key, value);
-            });
-            this.set(savedData, true);
-            if (!silent) {
-                this.message(['change', 'push'], this.get());
+            if (data !== undefined) {
+                savedData.set(key, data);
+                if (!silent) {
+                    this.message(['change', 'push'], this.get());
+                }
+                return true;
             }
-            return true;
-        }
-        else if (data) {
-            const additions = Array.isArray(data) ? data : [data];
-            // Capture the length so appending the collection to itself terminates.
-            const length = additions.length;
-            for (let index = 0; index < length; index++) {
-                savedData.push(additions[index]);
-            }
-            if (!silent) {
-                this.message(['change', 'push'], this.get());
-            }
-            return true;
-        }
-        else {
             return false;
         }
+        // Array callers historically pass false as a placeholder before the silent flag.
+        if ((data !== undefined && data !== false) || this.isMap(key) || key === undefined) {
+            return false;
+        }
+        const additions = Array.isArray(key) ? key : [key];
+        // Capture the length so appending the collection to itself terminates.
+        const length = additions.length;
+        for (let index = 0; index < length; index++) {
+            savedData.push(additions[index]);
+        }
+        if (!silent) {
+            this.message(['change', 'push'], this.get());
+        }
+        return true;
     }
     /**
      * Return the stored data or the requested collection member without cloning it.
@@ -115,7 +111,7 @@ class Collection extends Utilities {
      * @returns The backing data container or the selected member.
      */
     get(index) {
-        if (index && this.isMap(this.collectionData)) {
+        if (index !== undefined && this.isMap(this.collectionData)) {
             return this.collectionData.get(index);
         }
         else if (this.isFinite(index)) {
@@ -139,12 +135,17 @@ class Collection extends Utilities {
      * @returns True when an update was applied; false when it could not be applied.
      */
     update(index, updateData, silent = false) {
-        const item = this.get(index);
-        // if updating an item in the array or object
+        const collection = this.get();
         if (index !== undefined &&
             updateData !== undefined &&
-            this.get(index) &&
-            (Array.isArray(this.get()) || this.isMap(this.get()))) {
+            (Array.isArray(collection) || this.isMap(collection))) {
+            const hasItem = this.isMap(collection)
+                ? collection.has(index)
+                : Number.isInteger(index) && index >= 0 && index < collection.length;
+            if (!hasItem) {
+                return false;
+            }
+            const item = this.get(index);
             // if we are updating a model
             if (this.isPlainObject(updateData) &&
                 this.isModel(item) &&
@@ -172,7 +173,7 @@ class Collection extends Utilities {
                 }
                 return true;
             }
-            else if (updateData) {
+            else {
                 if (this.isMap(this.collectionData)) {
                     this.collectionData.set(index, updateData);
                 }
@@ -195,7 +196,6 @@ class Collection extends Utilities {
         else {
             return false;
         }
-        return false;
     }
     // the deleter
     /**
@@ -206,22 +206,25 @@ class Collection extends Utilities {
      */
     delete(index, silent = false) {
         if (index !== undefined && index !== false) {
-            if (Array.isArray(this.get()) && this.get(index)) {
-                this.set(this.pullAt(this.collectionData, index), true);
+            if (Array.isArray(this.collectionData)) {
+                if (!Number.isInteger(index) || index < 0 || index >= this.collectionData.length) {
+                    return false;
+                }
+                this.pullAt(this.collectionData, index);
                 if (!silent) {
                     this.message(['change', 'delete'], this.get());
                 }
                 return true;
             }
-            else if (this.isMap(this.get()) && this.get(index)) {
+            else if (this.isMap(this.collectionData)) {
+                if (!this.collectionData.has(index)) {
+                    return false;
+                }
                 this.collectionData.delete(index);
                 if (!silent) {
                     this.message(['change', 'delete'], this.get());
                 }
                 return true;
-            }
-            else {
-                return false;
             }
         }
         else {
@@ -237,6 +240,7 @@ class Collection extends Utilities {
             }
             return true;
         }
+        return false;
     }
     //sub service request methods
     /**

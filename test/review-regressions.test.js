@@ -55,3 +55,66 @@ test('large, sparse and self appends preserve array identity and one notificatio
     self.push(new Array(2));
     assert.deepEqual(self.get().slice(-2), [undefined, undefined]);
 });
+
+test('collection mutations support falsey values and Map keys', () => {
+    const array = new Collection([0, false, '', null]);
+    assert.equal(array.get(0), 0);
+    assert.equal(array.update(0, false), true);
+    assert.equal(array.get(0), false);
+    assert.equal(array.update(1, 0), true);
+    assert.equal(array.get(1), 0);
+    assert.equal(array.update(2, ''), true);
+    assert.equal(array.delete(0), true);
+    assert.deepEqual(array.get(), [0, '', null]);
+
+    const map = new Collection(new Map([[0, false], ['', 0]]));
+    assert.equal(map.get(0), false);
+    assert.equal(map.get(''), 0);
+    assert.equal(map.update(0, 0), true);
+    assert.equal(map.push(false, ''), true);
+    assert.equal(map.get(false), '');
+    assert.equal(map.delete(''), true);
+    assert.equal(map.get().has(''), false);
+});
+
+test('push respects backing type while preserving legacy silent placeholders', () => {
+    const array = new Collection([]);
+    let arrayChanges = 0;
+    array.on('change', () => arrayChanges++);
+    assert.equal(array.push(0), true);
+    assert.equal(array.push(null), true);
+    assert.deepEqual(array.get(), [0, null]);
+    assert.equal(array.push(['a', 'b'], false, true), true);
+    assert.deepEqual(array.get(), [0, null, 'a', 'b']);
+    assert.equal(arrayChanges, 2);
+    assert.equal(array.push('key', 'value'), false);
+    assert.deepEqual(array.get(), [0, null, 'a', 'b']);
+
+    const map = new Collection(new Map());
+    let mapChanges = 0;
+    map.on('change', () => mapChanges++);
+    assert.equal(map.push(0, false), true);
+    assert.equal(map.get(0), false);
+    assert.equal(map.push(new Map([['a', 1], ['b', 2]]), false, true), true);
+    assert.deepEqual(Array.from(map.get().entries()), [[0, false], ['a', 1], ['b', 2]]);
+    assert.equal(mapChanges, 1);
+    assert.equal(map.push('value-only'), false);
+});
+
+test('array update and delete reject invalid indexes without mutation', () => {
+    const collection = new Collection(['first', 'second']);
+    const original = collection.get();
+    for (const index of ['0', -1, 0.5, NaN, Infinity, 2]) {
+        assert.equal(collection.update(index, 'changed'), false);
+        assert.equal(collection.delete(index), false);
+        assert.deepEqual(collection.get(), ['first', 'second']);
+        assert.equal(collection.get(), original);
+    }
+});
+
+test('delete fails safely if backing storage is externally corrupted', () => {
+    const collection = new Collection(['item']);
+    collection.collectionData = {};
+    assert.equal(collection.delete(0), false);
+    assert.deepEqual(collection.get(), {});
+});

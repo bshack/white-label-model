@@ -19,10 +19,10 @@ test('safe merges tolerate absent sources and falsey notifications do not emit',
     assert.equal(utilities.message(['change'], null), false);
     assert.equal(emitted, false);
 });
-test('collection replaces Map values and rejects unsupported falsey updates', () => {
+test('collection replaces Map values including supported falsey updates', () => {
     const collection = new Collection(new Map([['item', 1]]));
     assert.equal(collection.update('item', 'updated'), true);
     assert.equal(collection.get('item'), 'updated');
-    assert.equal(collection.update('item', false), false);
-    assert.equal(collection.get('item'), 'updated');
+    assert.equal(collection.update('item', false), true);
+    assert.equal(collection.get('item'), false);
 });
