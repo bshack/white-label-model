@@ -34,4 +34,5 @@ jobs:
       - run: npm test
       - run: npm run coverage
       - run: npm run audit
+      - run: npm pack --dry-run
       - run: git diff --exit-code -- dist
