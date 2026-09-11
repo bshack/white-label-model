@@ -34,10 +34,13 @@ test('nested updates notify once, respect silence, and propagate rejection', () 
     assert.equal(child.get().count, 2);
 });
 
-test('void-returning model-like setters remain accepted and receive silence', () => {
-    const child = {data: {count: 1}, get() {return this.data;}, set(data, silent) {assert.equal(silent, true); this.data = data;}, message() {}};
-    assert.equal(new Collection([child]).update(0, {count: 2}), true);
-    assert.equal(child.data.count, 2);
+test('model-like setters must explicitly accept nested updates', () => {
+    const accepted = {data: {count: 1}, get() {return this.data;}, set(data, silent) {assert.equal(silent, true); this.data = data; return true;}, message() {}};
+    assert.equal(new Collection([accepted]).update(0, {count: 2}), true);
+    assert.equal(accepted.data.count, 2);
+    const legacyVoid = {data: {count: 1}, get() {return this.data;}, set() {}, message() {}};
+    assert.equal(new Collection([legacyVoid]).update(0, {count: 2}), false);
+    assert.equal(legacyVoid.data.count, 1);
 });
 
 test('large, sparse and self appends preserve array identity and one notification', () => {
@@ -75,16 +78,19 @@ test('collection mutations support falsey values and Map keys', () => {
     assert.equal(map.get(false), '');
     assert.equal(map.delete(''), true);
     assert.equal(map.get().has(''), false);
+    assert.equal(map.delete(false), true);
+    assert.equal(map.get().has(false), false);
 });
 
-test('push respects backing type while preserving legacy silent placeholders', () => {
+test('push uses explicit current signatures and rejects legacy silent placeholders', () => {
     const array = new Collection([]);
     let arrayChanges = 0;
     array.on('change', () => arrayChanges++);
     assert.equal(array.push(0), true);
     assert.equal(array.push(null), true);
     assert.deepEqual(array.get(), [0, null]);
-    assert.equal(array.push(['a', 'b'], false, true), true);
+    assert.equal(array.push(['legacy'], false, true), false);
+    assert.equal(array.push(['a', 'b'], true), true);
     assert.deepEqual(array.get(), [0, null, 'a', 'b']);
     assert.equal(arrayChanges, 2);
     assert.equal(array.push('key', 'value'), false);
@@ -95,7 +101,8 @@ test('push respects backing type while preserving legacy silent placeholders', (
     map.on('change', () => mapChanges++);
     assert.equal(map.push(0, false), true);
     assert.equal(map.get(0), false);
-    assert.equal(map.push(new Map([['a', 1], ['b', 2]]), false, true), true);
+    assert.equal(map.push(new Map([['legacy', 9]]), false, true), false);
+    assert.equal(map.push(new Map([['a', 1], ['b', 2]]), true), true);
     assert.deepEqual(Array.from(map.get().entries()), [[0, false], ['a', 1], ['b', 2]]);
     assert.equal(mapChanges, 1);
     assert.equal(map.push('value-only'), false);

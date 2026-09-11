@@ -1,6 +1,6 @@
 /** @module src/collection */
 import Utilities = require('./utilities');
-/** Array or Map storage with the original positional mutation API. */
+/** Array or Map storage with explicit mutation APIs. */
 declare class Collection extends Utilities {
     collectionData: unknown[] | Map<unknown, unknown>;
     /**
@@ -26,32 +26,20 @@ declare class Collection extends Utilities {
      */
     set(data: unknown, silent?: boolean): boolean;
     /**
-     * Append array data or insert Map entries, preserving the backing container.
-     * @param key - Map key or array data, according to the legacy positional API.
-     * @param data - Map value, or the legacy false placeholder used before the silent argument.
-     * @param silent - Suppress mutation notifications when true.
-     * @returns True when data was appended; false when no usable data was supplied.
+     * Append array data or insert Map entries without legacy placeholder arguments.
+     * Array form: push(valueOrValues, silent?). Map forms: push(key, value, silent?) or push(map, silent?).
      */
-    push(key: unknown, data?: unknown, silent?: boolean): boolean;
+    push(key: unknown, dataOrSilent?: unknown, silent?: boolean): boolean;
     get(): unknown[] | Map<unknown, unknown>;
     get(index: unknown): unknown;
     /** Recognize model-like collection members without requiring a particular class. */
     private isModel;
-    /**
-     * Merge object fields or replace a collection member, retaining the existing mutation contract.
-     * @param index - Array position or Map key; omission selects the whole collection.
-     * @param updateData - New fields or replacement data.
-     * @param silent - Suppress mutation notifications when true.
-     * @returns True when an update was applied; false when it could not be applied.
-     */
+    /** Merge object fields or replace one existing collection member. Use set() to replace the whole collection. */
     update(index: unknown, updateData?: unknown, silent?: boolean): boolean;
-    /**
-     * Remove stored data and notify subscribers unless silent mode is requested.
-     * @param index - Array position or Map key; omission selects the whole collection.
-     * @param silent - Suppress mutation notifications when true.
-     * @returns True when data was removed or cleared; false for a missing member.
-     */
-    delete(index?: unknown, silent?: boolean): boolean;
+    /** Clear all members while preserving the backing collection type. */
+    clear(silent?: boolean): boolean;
+    /** Remove one member by array index or Map key. */
+    delete(index: unknown, silent?: boolean): boolean;
     /**
      * Extension hook for a future GET transport; the default resolves an empty object without I/O.
      * @returns A promise resolving to an empty object; override to supply a transport.

@@ -60,8 +60,8 @@ test('collection appends single values and arrays without replacing its backing 
     const collection = new WhiteLabelModel.Collection(['red']);
     const originalData = collection.get();
 
-    assert.equal(collection.push('green', undefined, true), true);
-    assert.equal(collection.push(['blue', 'yellow'], undefined, true), true);
+    assert.equal(collection.push('green', true), true);
+    assert.equal(collection.push(['blue', 'yellow'], true), true);
     assert.equal(collection.get(), originalData);
     assert.deepEqual(collection.get(), ['red', 'green', 'blue', 'yellow']);
 });
