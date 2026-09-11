@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Configure current lint tooling
+      - name: Configure lint tooling
         shell: bash
         run: |
           node <<'NODE'
@@ -44,26 +44,36 @@ jobs:
             {files: ['**/*.ts', '**/*.tsx'], rules: {curly: ['error', 'all'], eqeqeq: ['error', 'always'], 'no-eval': 'error', 'no-implied-eval': 'error', 'no-new-wrappers': 'error', 'no-var': 'error', 'object-shorthand': ['error', 'always'], 'prefer-arrow-callback': ['error', {allowNamedFunctions: true}], 'prefer-const': 'error', 'prefer-template': 'error', 'quote-props': ['error', 'as-needed'], '@typescript-eslint/array-type': ['error', {default: 'array-simple'}], '@typescript-eslint/consistent-type-assertions': ['error', {assertionStyle: 'as'}], '@typescript-eslint/consistent-type-imports': ['error', {prefer: 'type-imports'}], '@typescript-eslint/no-explicit-any': 'error', '@typescript-eslint/no-non-null-assertion': 'error'}}
           );
           EOF
-          cat > .prettierrc.json <<'EOF'
-          {"bracketSpacing":false,"singleQuote":true,"trailingComma":"all","arrowParens":"avoid"}
-          EOF
-          cat > .prettierignore <<'EOF'
-          dist/
-          node_modules/
-          coverage/
-          EOF
+          printf '%s\n' '{"bracketSpacing":false,"singleQuote":true,"trailingComma":"all","arrowParens":"avoid"}' > .prettierrc.json
+          printf 'dist/\nnode_modules/\ncoverage/\n' > .prettierignore
           cat > STYLE.md <<'EOF'
           # Code style
 
           This project follows the Google TypeScript Style Guide. ESLint enforces correctness and TypeScript style rules, while Prettier uses Google's published GTS formatting choices.
 
-          TypeScript 7 remains the build compiler. The TypeScript 6 compatibility API is installed side-by-side for lint tooling, following the TypeScript 7 release guidance until the lint ecosystem moves to the TypeScript 7 API.
+          TypeScript 7 remains the build compiler. The TypeScript 6 compatibility API is installed side-by-side for lint tooling until the lint ecosystem moves to the TypeScript 7 API.
 
           - Run `npm run lint` to verify style and lint rules.
           - Run `npm run lint:fix` to apply safe automatic fixes.
-          - Do not suppress warnings or disable rules simply to make CI pass; fix the underlying code unless a narrowly documented exception is technically required.
-          - Generated output under `dist/` is not linted or formatted directly; it is regenerated from linted source.
+          - Do not suppress warnings or disable rules merely to make CI pass; fix the underlying code unless a narrowly documented exception is technically required.
+          - Generated output under `dist/` is regenerated from linted source.
           EOF
+      - name: Migrate source to Google module/style constructs
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const edits = {
+            'src/collection.ts': [["import Utilities = require('./utilities');", "import Utilities from './utilities';"], ['(resolve, reject) =>', 'resolve =>']],
+            'src/model.ts': [["import Utilities = require('./utilities');", "import Utilities from './utilities';"], ['(resolve, reject) =>', 'resolve =>']],
+            'src/index.ts': [["import Collection = require('./collection');", "import Collection from './collection';"], ["import Model = require('./model');", "import Model from './model';"]]
+          };
+          for (const [file, replacements] of Object.entries(edits)) {
+            let source = fs.readFileSync(file, 'utf8');
+            for (const [from, to] of replacements) source = source.split(from).join(to);
+            fs.writeFileSync(file, source);
+          }
+          NODE
       - run: npm run lint:fix
       - run: npm run lint
       - run: npm run build
@@ -72,25 +82,17 @@ jobs:
         run: |
           node <<'NODE'
           const fs = require('node:fs');
-          const candidates = ['.github/workflows/security.yml', '.github/workflows/ci.yml'];
-          const file = candidates.find(candidate => fs.existsSync(candidate));
-          if (!file) throw new Error('No permanent CI workflow found');
+          const file = '.github/workflows/security.yml';
           let source = fs.readFileSync(file, 'utf8');
-          if (!source.includes('npm run lint')) {
-            const marker = '      - run: npm ci --ignore-scripts\n';
-            if (!source.includes(marker)) throw new Error('npm ci step not found in permanent CI');
-            source = source.replace(marker, marker + '      - run: npm run lint\n');
-            fs.writeFileSync(file, source);
-          }
+          if (!source.includes('npm run lint')) source = source.replace('      - run: npm ci --ignore-scripts\n', '      - run: npm ci --ignore-scripts\n      - run: npm run lint\n');
+          fs.writeFileSync(file, source);
           NODE
       - run: rm .github/workflows/google-style-migration.yml
       - name: Commit migration
         shell: bash
         run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "Adopt Google TypeScript Style with ESLint"
-            git push
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Adopt Google TypeScript Style with ESLint"
+          git push
