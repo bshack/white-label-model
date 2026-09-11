@@ -73,15 +73,18 @@ class Collection extends Utilities {
                     return false;
                 }
                 key.forEach((value, mapKey) => savedData.set(mapKey, value));
-                if (dataOrSilent !== true)
+                if (dataOrSilent !== true) {
                     this.message(['change', 'push'], this.get());
+                }
                 return true;
             }
-            if (arguments.length < 2)
+            if (arguments.length < 2) {
                 return false;
+            }
             savedData.set(key, dataOrSilent);
-            if (!silent)
+            if (!silent) {
                 this.message(['change', 'push'], this.get());
+            }
             return true;
         }
         if (!Array.isArray(savedData) || arguments.length > 2 ||
@@ -91,10 +94,12 @@ class Collection extends Utilities {
         }
         const additions = Array.isArray(key) ? key : [key];
         const length = additions.length;
-        for (let index = 0; index < length; index++)
+        for (let index = 0; index < length; index++) {
             savedData.push(additions[index]);
-        if (dataOrSilent !== true)
+        }
+        if (dataOrSilent !== true) {
             this.message(['change', 'push'], this.get());
+        }
         return true;
     }
     /**
@@ -123,17 +128,20 @@ class Collection extends Utilities {
     update(index, updateData, silent = false) {
         const collection = this.get();
         if (index === undefined || updateData === undefined ||
-            (!Array.isArray(collection) && !this.isMap(collection)))
+            (!Array.isArray(collection) && !this.isMap(collection))) {
             return false;
+        }
         const hasItem = this.isMap(collection)
             ? collection.has(index)
             : Number.isInteger(index) && index >= 0 && index < collection.length;
-        if (!hasItem)
+        if (!hasItem) {
             return false;
+        }
         const item = this.get(index);
         if (this.isPlainObject(updateData) && this.isModel(item) && this.isPlainObject(item.get())) {
-            if (item.set(this.extend(item.get(), updateData), true) !== true)
+            if (item.set(this.extend(item.get(), updateData), true) !== true) {
                 return false;
+            }
             if (!silent) {
                 item.message(['change', 'update'], item.get());
                 this.message(['change', 'update'], this.get());
@@ -143,39 +151,46 @@ class Collection extends Utilities {
         const value = this.isPlainObject(updateData) && this.isPlainObject(item)
             ? this.extend(item, updateData)
             : updateData;
-        if (this.isMap(this.collectionData))
+        if (this.isMap(this.collectionData)) {
             this.collectionData.set(index, value);
-        else
+        }
+        else {
             this.collectionData[index] = value;
-        if (!silent)
+        }
+        if (!silent) {
             this.message(['change', 'update'], this.get());
+        }
         return true;
     }
     // the clearer and deleter
     /** Clear all members while preserving the backing collection type. */
     clear(silent = false) {
         this.collectionData = this.isMap(this.collectionData) ? new Map() : [];
-        if (!silent)
+        if (!silent) {
             this.message(['change', 'delete'], this.get());
+        }
         return true;
     }
     /** Remove one member by array index or Map key. */
     delete(index, silent = false) {
         if (Array.isArray(this.collectionData)) {
-            if (!Number.isInteger(index) || index < 0 || index >= this.collectionData.length)
+            if (!Number.isInteger(index) || index < 0 || index >= this.collectionData.length) {
                 return false;
+            }
             this.pullAt(this.collectionData, index);
         }
         else if (this.isMap(this.collectionData)) {
-            if (!this.collectionData.has(index))
+            if (!this.collectionData.has(index)) {
                 return false;
+            }
             this.collectionData.delete(index);
         }
         else {
             return false;
         }
-        if (!silent)
+        if (!silent) {
             this.message(['change', 'delete'], this.get());
+        }
         return true;
     }
     //sub service request methods

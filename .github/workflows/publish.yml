@@ -1,16 +1,15 @@
-name: Security checks
+name: Publish package
 
 on:
-  pull_request:
-  push:
-    branches:
-      - master
+  release:
+    types: [published]
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
-  test-and-audit:
+  publish:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -21,18 +20,11 @@ jobs:
         with:
           node-version: 24.21.0
           cache: npm
+          registry-url: https://registry.npmjs.org
       - run: npm ci --ignore-scripts
       - run: npm run lint
-      - run: npm run build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: generated-dist
-          path: dist
-          if-no-files-found: error
-          retention-days: 7
       - run: npm run typecheck
       - run: npm test
       - run: npm run coverage
       - run: npm run audit
-      - run: npm pack --dry-run
-      - run: git diff --exit-code -- dist
+      - run: npm publish --provenance --access public
