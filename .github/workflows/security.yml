@@ -34,6 +34,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Same-repository PRs may persist compiler output after verification passes.
   sync-generated-dist:
     needs: test-and-audit
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
