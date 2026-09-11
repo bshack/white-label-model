@@ -111,3 +111,10 @@ test('array update and delete reject invalid indexes without mutation', () => {
         assert.equal(collection.get(), original);
     }
 });
+
+test('delete fails safely if backing storage is externally corrupted', () => {
+    const collection = new Collection(['item']);
+    collection.collectionData = {};
+    assert.equal(collection.delete(0), false);
+    assert.deepEqual(collection.get(), {});
+});
