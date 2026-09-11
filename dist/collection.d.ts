@@ -28,7 +28,7 @@ declare class Collection extends Utilities {
     /**
      * Append array data or insert Map entries, preserving the backing container.
      * @param key - Map key or array data, according to the legacy positional API.
-     * @param data - Data supplied by the caller; validation follows the method contract.
+     * @param data - Map value, or the legacy false placeholder used before the silent argument.
      * @param silent - Suppress mutation notifications when true.
      * @returns True when data was appended; false when no usable data was supplied.
      */
