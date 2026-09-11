@@ -77,17 +77,36 @@ test('collection mutations support falsey values and Map keys', () => {
     assert.equal(map.get().has(''), false);
 });
 
-test('push respects the backing collection type', () => {
+test('push respects backing type while preserving legacy silent placeholders', () => {
     const array = new Collection([]);
+    let arrayChanges = 0;
+    array.on('change', () => arrayChanges++);
     assert.equal(array.push(0), true);
     assert.deepEqual(array.get(), [0]);
+    assert.equal(array.push(['a', 'b'], false, true), true);
+    assert.deepEqual(array.get(), [0, 'a', 'b']);
+    assert.equal(arrayChanges, 1);
     assert.equal(array.push('key', 'value'), false);
-    assert.deepEqual(array.get(), [0]);
+    assert.deepEqual(array.get(), [0, 'a', 'b']);
 
     const map = new Collection(new Map());
+    let mapChanges = 0;
+    map.on('change', () => mapChanges++);
     assert.equal(map.push(0, false), true);
     assert.equal(map.get(0), false);
-    assert.equal(map.push(new Map([['a', 1], ['b', 2]])), true);
+    assert.equal(map.push(new Map([['a', 1], ['b', 2]]), false, true), true);
     assert.deepEqual(Array.from(map.get().entries()), [[0, false], ['a', 1], ['b', 2]]);
+    assert.equal(mapChanges, 1);
     assert.equal(map.push('value-only'), false);
+});
+
+test('array update and delete reject invalid indexes without mutation', () => {
+    const collection = new Collection(['first', 'second']);
+    const original = collection.get();
+    for (const index of ['0', -1, 0.5, NaN, Infinity, 2]) {
+        assert.equal(collection.update(index, 'changed'), false);
+        assert.equal(collection.delete(index), false);
+        assert.deepEqual(collection.get(), ['first', 'second']);
+        assert.equal(collection.get(), original);
+    }
 });
