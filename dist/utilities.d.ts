@@ -17,18 +17,20 @@ declare class Utilities extends EventEmitter {
     isMap(object: unknown): object is Map<unknown, unknown>;
     /**
      * Accept finite numbers without coercing strings or other values.
+     * @deprecated Use Number.isFinite directly; retained for compatibility.
      * @param number - Numeric value to inspect or format.
      * @returns Whether the value is a finite number.
      */
     isFinite(number: unknown): number is number;
     /**
-     * Accept ordinary objects and objects with a null prototype, excluding class instances.
+     * Accept ordinary objects and objects with a null prototype, including ordinary objects from another realm.
      * @param object - Value to inspect without coercion.
      * @returns Whether the value is a plain object.
      */
     isPlainObject(object: unknown): object is Record<string, unknown>;
     /**
      * Remove one array member in place and return the original array.
+     * @deprecated Use Array.prototype.splice directly; retained for compatibility.
      * @param data - Data supplied by the caller; validation follows the method contract.
      * @param index - Array position or Map key; omission selects the whole collection.
      * @returns The same array after removing one member.
