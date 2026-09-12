@@ -14,7 +14,7 @@
   "files": ["dist", "README.md"],
   "engines": {"node": "^22.18.0 || >=24.11.0", "npm": ">=11.0"},
   "packageManager": "npm@11.19.1",
-  "keywords": ["es6", "es2015", "model", "collection", "javascript", "js", "events"],
+  "keywords": ["javascript", "typescript", "model", "state", "observable", "proxy", "events", "map", "collection"],
   "contributors": [{"name": "Bill Shackelford", "url": "https://github.com/bshack"}],
   "scripts": {
     "build": "tsc -p tsconfig.json",
