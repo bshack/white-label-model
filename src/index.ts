@@ -2,6 +2,7 @@
 import ModelImplementation = require('./model');
 
 type ModelData = Record<PropertyKey, unknown> | unknown[] | Map<unknown, unknown>;
+type ModelEventMethod = 'on' | 'once' | 'addListener' | 'off' | 'removeListener' | 'emit';
 
 interface ModelMutation<T extends ModelData> {
     operation: 'set' | 'delete' | 'clear';
@@ -24,7 +25,7 @@ interface ModelEvents<T extends ModelData> {
 type ModelEventName<T extends ModelData> = keyof ModelEvents<T>;
 type ModelEventArguments<T extends ModelData, Name extends ModelEventName<T>> = ModelEvents<T>[Name];
 
-type Model<T extends ModelData = Record<string, unknown>> = ModelImplementation<T> & {
+type Model<T extends ModelData = Record<string, unknown>> = Omit<ModelImplementation<T>, ModelEventMethod> & {
     on<Name extends ModelEventName<T>>(
         eventName: Name,
         listener: (...arguments_: ModelEventArguments<T, Name>) => void
