@@ -295,7 +295,7 @@ Direct assignments through the observable proxy returned by `get()` do **not** r
 
 ## Relay events through a mediator
 
-Mediator integration is optional. Model does not import or require `white-label-mediator`; any EventEmitter-compatible object can be assigned to `model.mediator`.
+Mediator integration is optional. Model does not import or require [`white-label-mediator`](https://github.com/bshack/white-label-mediator); any EventEmitter-compatible object can be assigned to `model.mediator`.
 
 Set both `name` and `mediator` to relay local events as `model:<name>:<event>` regardless of root shape:
 
