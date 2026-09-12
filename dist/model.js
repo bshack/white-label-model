@@ -49,6 +49,9 @@ class Model extends Utilities {
     }
     /** Return whether a nested value should participate in deep change tracking. */
     isObservable(value) {
+        if (value === null || typeof value !== 'object') {
+            return false;
+        }
         return Array.isArray(value) || this.isMap(value) || this.isPlainObject(value);
     }
     /** Prevent direct object writes from using prototype-pollution keys. */
@@ -282,15 +285,17 @@ class Model extends Utilities {
         const nextValue = this.isPlainObject(current) && this.isPlainObject(dataOrSilent)
             ? this.extend(current, dataOrSilent)
             : this.toRaw(dataOrSilent);
-        const candidate = isMapState ? new Map(raw) : raw.slice();
-        if (isMapState) {
-            candidate.set(keyOrData, nextValue);
-        }
-        else {
-            candidate[keyOrData] = nextValue;
-        }
-        if (!this.accepts(candidate)) {
-            return false;
+        if (this.validator) {
+            const candidate = isMapState ? new Map(raw) : raw.slice();
+            if (isMapState) {
+                candidate.set(keyOrData, nextValue);
+            }
+            else {
+                candidate[keyOrData] = nextValue;
+            }
+            if (!this.accepts(candidate)) {
+                return false;
+            }
         }
         if (isMapState) {
             raw.set(keyOrData, nextValue);
@@ -319,8 +324,7 @@ class Model extends Utilities {
             else {
                 additions.push(this.toRaw(key));
             }
-            const candidate = raw.concat(additions);
-            if (!this.accepts(candidate)) {
+            if (this.validator && !this.accepts(raw.concat(additions))) {
                 return false;
             }
             for (let index = 0; index < additions.length; index += 1) {
@@ -338,12 +342,16 @@ class Model extends Utilities {
             if (arguments.length > 2 || (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean')) {
                 return false;
             }
-            const candidate = new Map(raw);
-            key.forEach((value, mapKey) => candidate.set(mapKey, this.toRaw(value)));
-            if (!this.accepts(candidate)) {
-                return false;
+            const additions = [];
+            key.forEach((value, mapKey) => additions.push([mapKey, this.toRaw(value)]));
+            if (this.validator) {
+                const candidate = new Map(raw);
+                additions.forEach(([mapKey, value]) => candidate.set(mapKey, value));
+                if (!this.accepts(candidate)) {
+                    return false;
+                }
             }
-            candidate.forEach((value, mapKey) => raw.set(mapKey, value));
+            additions.forEach(([mapKey, value]) => raw.set(mapKey, value));
             if (dataOrSilent !== true) {
                 this.message(['change', 'push'], this.get());
             }
@@ -352,12 +360,15 @@ class Model extends Utilities {
         if (arguments.length < 2) {
             return false;
         }
-        const candidate = new Map(raw);
-        candidate.set(key, this.toRaw(dataOrSilent));
-        if (!this.accepts(candidate)) {
-            return false;
+        const rawNextValue = this.toRaw(dataOrSilent);
+        if (this.validator) {
+            const candidate = new Map(raw);
+            candidate.set(key, rawNextValue);
+            if (!this.accepts(candidate)) {
+                return false;
+            }
         }
-        raw.set(key, this.toRaw(dataOrSilent));
+        raw.set(key, rawNextValue);
         if (!silent) {
             this.message(['change', 'push'], this.get());
         }
@@ -366,36 +377,44 @@ class Model extends Utilities {
     /** Delete one property, array index, or Map entry. Use clear() to empty all state. */
     delete(key, silent = false) {
         const raw = this.rawState();
-        let candidate;
-        if (this.isMap(raw)) {
+        const isMapState = this.isMap(raw);
+        const isArrayState = Array.isArray(raw);
+        if (isMapState) {
             if (!raw.has(key)) {
                 return false;
             }
-            candidate = new Map(raw);
-            candidate.delete(key);
         }
-        else if (Array.isArray(raw)) {
+        else if (isArrayState) {
             if (!Number.isInteger(key) || key < 0 || key >= raw.length) {
                 return false;
             }
-            candidate = raw.slice();
-            candidate.splice(key, 1);
         }
-        else {
-            if ((typeof key !== 'string' && typeof key !== 'symbol' && typeof key !== 'number') ||
-                !Object.prototype.hasOwnProperty.call(raw, key)) {
-                return false;
-            }
-            candidate = { ...raw };
-            Reflect.deleteProperty(candidate, typeof key === 'number' ? String(key) : key);
-        }
-        if (!this.accepts(candidate)) {
+        else if ((typeof key !== 'string' && typeof key !== 'symbol' && typeof key !== 'number') ||
+            !Object.prototype.hasOwnProperty.call(raw, key)) {
             return false;
         }
-        if (this.isMap(raw)) {
+        if (this.validator) {
+            let candidate;
+            if (isMapState) {
+                candidate = new Map(raw);
+                candidate.delete(key);
+            }
+            else if (isArrayState) {
+                candidate = raw.slice();
+                candidate.splice(key, 1);
+            }
+            else {
+                candidate = { ...raw };
+                Reflect.deleteProperty(candidate, typeof key === 'number' ? String(key) : key);
+            }
+            if (!this.accepts(candidate)) {
+                return false;
+            }
+        }
+        if (isMapState) {
             raw.delete(key);
         }
-        else if (Array.isArray(raw)) {
+        else if (isArrayState) {
             raw.splice(key, 1);
         }
         else {
