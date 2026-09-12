@@ -78,6 +78,14 @@ describe('Unified Model', () => {
         assert.equal(model.update(0), false);
     });
 
+    it('validates successful array member updates against candidate state', () => {
+        const model = new Model([1, 2], value => value.every(item => item < 10));
+        assert.equal(model.update(1, 3), true);
+        assert.deepEqual(model.get(), [1, 3]);
+        assert.equal(model.update(1, 10), false);
+        assert.deepEqual(model.get(), [1, 3]);
+    });
+
     it('updates Map members and validates candidate collection state', () => {
         const model = new Model(new Map([['person', {name: 'Ada', active: true}]]), value => value.get('person')?.name !== 'Invalid');
         assert.equal(model.update('person', {name: 'Grace'}), true);
@@ -145,6 +153,9 @@ describe('Unified Model', () => {
     it('rejects deletes that fail validation', () => {
         const object = new Model({required: true}, value => value.required === true);
         assert.equal(object.delete('required'), false);
+        const numbered = new Model({2: 'two', required: true}, value => value.required === true);
+        assert.equal(numbered.delete(2), true);
+        assert.deepEqual(numbered.get(), {required: true});
         const array = new Model(['required'], value => value.length > 0);
         assert.equal(array.delete(0), false);
         const map = new Model(new Map([['required', true]]), value => value.has('required'));

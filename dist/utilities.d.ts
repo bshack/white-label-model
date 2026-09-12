@@ -35,7 +35,8 @@ declare class Utilities extends EventEmitter {
      */
     pullAt<T>(data: T[], index: number): T[];
     /**
-     * Create a shallow merge using own properties while blocking prototype-pollution keys.
+     * Create a shallow merge using enumerable own properties while blocking prototype-pollution keys.
+     * The earlier source's prototype is retained so null-prototype state remains null-prototype state.
      * @param object1 - Earlier merge source; null is ignored.
      * @param object2 - Later merge source; null is ignored.
      * @returns A new merged object without blocked prototype keys.
