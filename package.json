@@ -1,7 +1,7 @@
 {
   "name": "white-label-model",
-  "version": "4.0.0",
-  "description": "A simple ES6 JS data model that emits events on data change. Offers support for collections of models.",
+  "version": "6.0.0",
+  "description": "A unified observable data model for plain objects, arrays, and Maps.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -11,30 +11,11 @@
       "default": "./dist/index.js"
     }
   },
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "engines": {
-    "node": "^22.18.0 || >=24.11.0",
-    "npm": ">=11.0"
-  },
+  "files": ["dist", "README.md"],
+  "engines": {"node": "^22.18.0 || >=24.11.0", "npm": ">=11.0"},
   "packageManager": "npm@11.19.1",
-  "keywords": [
-    "es6",
-    "es2015",
-    "model",
-    "collection",
-    "javascript",
-    "js",
-    "events"
-  ],
-  "contributors": [
-    {
-      "name": "Bill Shackelford",
-      "url": "https://github.com/bshack"
-    }
-  ],
+  "keywords": ["es6", "es2015", "model", "collection", "javascript", "js", "events"],
+  "contributors": [{"name": "Bill Shackelford", "url": "https://github.com/bshack"}],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && npm run test:types && npm run test:unit",
@@ -47,22 +28,12 @@
     "prepack": "npm run build",
     "test:types": "tsc -p tsconfig.consumer.json"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/bshack/white-label-model.git"
-  },
-  "author": {
-    "name": "Bill Shackelford",
-    "url": "https://github.com/bshack"
-  },
+  "repository": {"type": "git", "url": "git+https://github.com/bshack/white-label-model.git"},
+  "author": {"name": "Bill Shackelford", "url": "https://github.com/bshack"},
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/bshack/white-label-model/issues"
-  },
+  "bugs": {"url": "https://github.com/bshack/white-label-model/issues"},
   "homepage": "https://github.com/bshack/white-label-model#readme",
-  "dependencies": {
-    "events": "3.3.0"
-  },
+  "dependencies": {"events": "3.3.0"},
   "devDependencies": {
     "@babel/core": "8.0.5",
     "@babel/eslint-parser": "8.0.5",
@@ -75,15 +46,8 @@
   },
   "c8": {
     "all": true,
-    "include": [
-      "src/**/*.ts"
-    ],
-    "reporter": [
-      "text",
-      "json",
-      "json-summary",
-      "lcov"
-    ],
+    "include": ["src/**/*.ts"],
+    "reporter": ["text", "json", "json-summary", "lcov"],
     "excludeAfterRemap": true,
     "checkCoverage": true,
     "lines": 100,
@@ -91,8 +55,6 @@
     "branches": 100,
     "statements": 100,
     "perFile": true,
-    "exclude": [
-      "**/*.d.ts"
-    ]
+    "exclude": ["**/*.d.ts"]
   }
 }

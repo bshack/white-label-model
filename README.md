@@ -1,26 +1,47 @@
 # white-label-model
 
-`white-label-model` provides two small event-emitting data containers:
+`white-label-model` provides one observable `Model` for plain-object, array, or `Map` state. The same class handles keyed objects, ordered collections, and map collections while emitting predictable synchronous events.
 
-- `Model` stores a plain JavaScript object.
-- `Collection` stores an array or a `Map`.
-
-Both classes emit predictable events when data changes, can relay namespaced events through a mediator, and provide lifecycle hooks for application code.
-
-The package has no DOM or generated HTML, so WCAG and search indexing are application responsibilities. When model state controls an interface, expose changes through semantic controls and appropriate status announcements, keep keyboard and pointer experiences equivalent, and avoid hiding primary public content behind client-only state.
+The package has no DOM or generated HTML. Accessibility and search behavior remain responsibilities of the consuming application.
 
 ## Requirements
 
-- Node.js `^22.18.0` or `>=24.11.0` for installation and development
-- Native `Map` support when using map collections
+- Node.js `^22.18.0` or `>=24.11.0`
+- npm `>=11.0`
+- Native `Proxy` support for deep observation
+- Native `Map` support when using `Map` state
 
 ## Versioning policy
 
-Backward compatibility is not maintained through placeholder arguments, sentinel values, deprecated overloads, or permissive legacy return contracts. Breaking public API changes are communicated with a Semantic Versioning major release and migration notes.
+Backward compatibility is not maintained through aliases, deprecated signatures, placeholder arguments, fallback code paths, or other compatibility shims. Breaking public API changes are communicated with a Semantic Versioning major release and migration notes.
 
-### Version 4 migration
+## Version 6 migration
 
-Array `push` now uses `push(valueOrValues, silent?)`; bulk Map `push` uses `push(map, silent?)`. The legacy `false` placeholder forms are rejected. Whole-collection replacement uses `set()` rather than the former `update(collection, placeholder, silent)` overload. Clearing uses `clear(silent?)`; `delete()` now always removes one member, so `false` is a valid Map key. Model-like nested setters must return `true` to accept updates. No compatibility shims are retained.
+Version 6 replaces the separate `Model` and `Collection` public classes with one `Model` entry point. `Collection` is removed rather than retained as an alias.
+
+```js
+import {Model} from 'white-label-model';
+
+const profile = new Model({name: 'Ada'});
+const tasks = new Model([{id: 1, complete: false}]);
+const people = new Model(new Map([
+    ['ada', {name: 'Ada'}]
+]));
+```
+
+Migrate former collection construction directly:
+
+```js
+// Before
+const tasks = new Collection([]);
+
+// Version 6
+const tasks = new Model([]);
+```
+
+All supported root shapes now use the `model:<name>:<event>` mediator namespace. Arrays and Maps also gain the same lazy deep observation as object state.
+
+Version 6 includes the deep-observation work originally planned for version 5: `get()` returns an observable proxy, and direct nested writes can emit path-specific mutation events without recursively scanning the complete state tree.
 
 ## Install and import
 
@@ -28,139 +49,177 @@ Array `push` now uses `push(valueOrValues, silent?)`; bulk Map `push` uses `push
 npm install white-label-model
 ```
 
-```js
-import {Collection, Model} from 'white-label-model';
-```
-
-CommonJS is also supported:
+ES modules:
 
 ```js
-const {Collection, Model} = require('white-label-model');
+import {Model} from 'white-label-model';
 ```
 
-## Model quick start
+CommonJS:
+
+```js
+const {Model} = require('white-label-model');
+```
+
+## One model, three root shapes
+
+### Plain object
 
 ```js
 const profile = new Model({
     id: 42,
-    name: 'Ada'
-});
-
-profile.on('change', (data) => {
-    console.log('Current profile:', data);
+    name: 'Ada',
+    preferences: {theme: 'light'}
 });
 
 profile.update({name: 'Grace'});
-console.log(profile.get()); // {id: 42, name: 'Grace'}
+profile.get().preferences.theme = 'dark';
 ```
 
-### Model methods
-
-| Method | Behavior | Events |
-| --- | --- | --- |
-| `get()` | Returns the stored object. | None |
-| `set(data, silent)` | Replaces all model data with a plain object. | `change`, `set` |
-| `update(data, silent)` | Creates a shallow merge of current and new safe own properties. | `change`, `update` |
-| `delete(silent)` | Replaces the data with an empty object. | `change`, `delete` |
-| `initialize()` | Lifecycle hook that returns the model. | None |
-| `destroy()` | Clears data silently and removes all listeners. | None |
-
-Mutation methods return `true` when the input is accepted and `false` when it is not. Pass `true` as the final `silent` argument to change data without emitting events:
+### Array
 
 ```js
-profile.set({id: 42, name: 'Ada'}, true);
-profile.update({name: 'Grace'}, true);
-profile.delete(true);
-```
-
-`update()` blocks the special keys `__proto__`, `constructor`, and `prototype` while merging. The merge is shallow; nested objects are replaced rather than recursively merged.
-
-## Collection quick start
-
-Array collections are the default:
-
-```js
-const colors = new Collection(['red', 'green']);
-
-colors.on('push', (items) => {
-    console.log('Collection now contains:', items);
-});
-
-colors.push('blue');
-console.log(colors.get(1)); // green
-```
-
-Use a `Map` when items need named keys:
-
-```js
-const people = new Collection(new Map([
-    ['ada', new Model({name: 'Ada'})]
-]));
-
-people.push('grace', new Model({name: 'Grace'}));
-console.log(people.get('grace').get()); // {name: 'Grace'}
-```
-
-### Collection methods
-
-| Method | Behavior | Events |
-| --- | --- | --- |
-| `get()` | Returns the complete array or `Map`. | None |
-| `get(index)` | Returns one array item or map value. | None |
-| `set(data, silent)` | Replaces the collection with an array or `Map`. | `change`, `set` |
-| `push(value, silent)` | Adds one value or an array of values to an array collection. | `change`, `push` |
-| `push(key, value, silent)` | Adds one entry to a map collection. | `change`, `push` |
-| `push(map, silent)` | Adds every entry from another `Map`. | `change`, `push` |
-| `update(index, value, silent)` | Updates one item. Plain objects are shallowly merged. | `change`, `update` |
-| `delete(index, silent)` | Removes one item. | `change`, `delete` |
-| `clear(silent)` | Clears the collection while preserving array/map type. | `change`, `delete` |
-| `destroy()` | Clears data silently and removes all listeners. | None |
-
-Examples:
-
-```js
-const tasks = new Collection([
+const tasks = new Model([
     {id: 1, complete: false},
     {id: 2, complete: false}
 ]);
 
 tasks.update(1, {complete: true});
-tasks.delete(0);
 tasks.push({id: 3, complete: false});
-
-// Replace all collection data without emitting an event.
-tasks.set([], true);
-
-// Add array data without emitting an event.
-tasks.push({id: 4, complete: false}, true);
+tasks.delete(0);
 ```
 
-The object returned by `get()` is the stored object, array, or `Map`, not a defensive copy. Treat it as read-only and use mutation methods when you want events to be emitted.
+### Map
+
+```js
+const people = new Model(new Map([
+    ['ada', {name: 'Ada'}]
+]));
+
+people.push('grace', {name: 'Grace'});
+people.update('ada', {name: 'Ada Lovelace'});
+console.log(people.get('grace'));
+```
+
+## API
+
+The supported signatures depend on the current root shape.
+
+| Method | Plain object | Array | Map | Events |
+| --- | --- | --- | --- | --- |
+| `get()` | Complete object | Complete array | Complete Map | None |
+| `get(key)` | Property value | Item by integer index | Value by key | None |
+| `set(data, silent?)` | Replace root with any supported shape | Same | Same | `change`, `set` |
+| `update(data, silent?)` | Shallow merge safe own properties | — | — | `change`, `update` |
+| `update(index, value, silent?)` | — | Replace/merge one item | — | `change`, `update` |
+| `update(key, value, silent?)` | — | — | Replace/merge one value | `change`, `update` |
+| `push(valueOrValues, silent?)` | Returns `false` | Append one or many values | — | `change`, `push` |
+| `push(key, value, silent?)` | Returns `false` | — | Add/replace one entry | `change`, `push` |
+| `push(map, silent?)` | Returns `false` | — | Add every entry | `change`, `push` |
+| `delete(key, silent?)` | Delete one property | Delete one index | Delete one entry | `change`, `delete` |
+| `clear(silent?)` | Replace with `{}` | Replace with `[]` | Replace with empty `Map` | `change`, `clear` |
+| `destroy()` | Clear silently and remove listeners | Same | Same | None |
+
+Explicit mutation methods return `true` when accepted and `false` when rejected. Passing `true` as the final `silent` argument suppresses their events.
+
+`update()` shallow-merges plain objects and blocks `__proto__`, `constructor`, and `prototype` from merge input. It does not recursively merge nested objects.
+
+`clear()` preserves the current root shape. `destroy()` uses silent clearing and removes listeners.
+
+## Deep observation
+
+Object, array, and Map branches are proxied lazily as they are accessed. There is no configured nesting-depth limit and no whole-model deep comparison after a mutation.
+
+```js
+const model = new Model({
+    user: {
+        profile: {
+            preferences: {
+                theme: 'light'
+            }
+        }
+    }
+});
+
+model.on('mutate', ({operation, path, oldValue, newValue, state}) => {
+    console.log(operation, path, oldValue, newValue, state);
+});
+
+model.get().user.profile.preferences.theme = 'dark';
+// path: ['user', 'profile', 'preferences', 'theme']
+```
+
+A changed direct property write emits:
+
+- `change` with the complete current state.
+- `mutate` with `{operation, path, oldValue, newValue, state}`.
+
+Assigning the same value is ignored. Direct property deletion is observed. Array mutations performed through the returned proxy are observed through the property operations they perform. `Map#get()` returns observable nested values; direct `Map#set()`, `Map#delete()`, and `Map#clear()` are also observed.
+
+Direct writes to the object keys `__proto__`, `constructor`, and `prototype` are rejected.
+
+### Performance model
+
+Observation is lazy and path-based. Accessing a branch creates proxies only for that branch, and a direct mutation does not scan or deep-diff unrelated state.
+
+The regression suite includes:
+
+- very deep nested paths with no artificial library depth limit;
+- a throwing unrelated getter to prove unrelated branches are not traversed;
+- a model containing 20,000 unrelated properties;
+- 1,000 observed nested writes with a CI regression ceiling.
+
+The timing check is a regression guard, not a universal performance guarantee. Runtime cost still depends on path depth, event listeners, validation performed by explicit operations, and the consuming application.
 
 ## Events
 
-Every successful non-silent mutation emits both `change` and an operation-specific event:
+Successful non-silent explicit mutations emit `change` followed by their operation-specific event.
 
 ```js
-profile.on('change', handleAnyChange);
-profile.on('set', handleReplacement);
-profile.on('update', handleUpdate);
-profile.on('delete', handleDeletion);
-
-colors.on('push', handleAddition);
+model.on('change', handleAnyChange);
+model.on('set', handleReplacement);
+model.on('update', handleUpdate);
+model.on('push', handleAppend);
+model.on('delete', handleDeletion);
+model.on('clear', handleClear);
+model.on('mutate', handleDirectMutation);
 ```
 
-All listeners receive the complete current model or collection data.
+Operation-specific listeners receive the complete current state. Direct proxy mutation listeners receive the path-specific `mutate` payload described above.
 
 Remove a listener with the same callback reference:
 
 ```js
-profile.removeListener('change', handleAnyChange);
+model.removeListener('change', handleAnyChange);
 ```
+
+## Runtime validation
+
+Pass an optional validator when explicit state changes must satisfy a runtime contract:
+
+```ts
+const user = new Model({name: 'Ada'}, value =>
+    typeof value === 'object' && value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as {name?: unknown}).name === 'string'
+);
+```
+
+The validator applies to:
+
+- initial construction;
+- `set()`;
+- explicit `update()`;
+- explicit `push()`;
+- explicit `delete()`.
+
+Invalid construction throws `TypeError`. Invalid later explicit mutations return `false` and leave existing state unchanged.
+
+Direct assignments through the observable proxy returned by `get()` do **not** run the optional whole-state validator. Use explicit mutation methods when validation is required. `clear()` and `destroy()` bypass acceptance validation so lifecycle cleanup cannot be blocked by a validator that requires fields or members.
 
 ## Relay events through a mediator
 
-Set both `name` and `mediator` to relay each local event under the pattern `<type>:<name>:<event>`:
+Set both `name` and `mediator` to relay local events as `model:<name>:<event>` regardless of root shape:
 
 ```js
 import Mediator from 'white-label-mediator';
@@ -172,16 +231,14 @@ const session = new Model({authenticated: false});
 session.name = 'session';
 session.mediator = mediator;
 
-mediator.on('model:session:update', (data) => {
+mediator.on('model:session:update', data => {
     console.log('Session changed:', data);
 });
 
 session.update({authenticated: true});
 ```
 
-The model still emits its local `change` and `update` events in addition to the mediator messages.
-
-## Extend a model or collection
+## Extend Model
 
 ```js
 class UserModel extends Model {
@@ -195,53 +252,33 @@ class UserModel extends Model {
         return this.get();
     }
 }
-
-const user = new UserModel();
 ```
 
-`serviceGet`, `servicePatch`, `servicePost`, and `servicePut` are placeholder async methods on both base classes. They resolve to an empty object until an application overrides them; they do not perform network requests by themselves.
+`serviceGet`, `servicePatch`, `servicePost`, and `servicePut` are extension hooks. The base implementations resolve an empty object and do not perform network requests.
+
+## TypeScript
+
+`Model<T>` describes the supported root state:
+
+```ts
+import {Model} from 'white-label-model';
+
+const profile = new Model<{name: string}>({name: 'Ada'});
+const tasks = new Model<Array<{id: number; complete: boolean}>>([]);
+const people = new Model<Map<string, {name: string}>>(new Map());
+
+profile.update({name: 'Grace'});
+tasks.push({id: 1, complete: false});
+people.push('ada', {name: 'Ada'});
+```
+
+TypeScript types do not validate untrusted runtime data; use the optional validator where needed.
 
 ## Event backend compatibility
 
-The test suite also loads the npm browser implementation explicitly and checks it against the same EventEmitter contract as Node. See [the compatibility contract and replacement assessment](https://github.com/bshack/white-label-model/blob/master/docs/events-compatibility.md) for covered behavior and limitations. These checks run under Node and do not replace real-browser integration testing.
+The test suite loads both Node's EventEmitter implementation and the npm browser implementation against the same event contract. See `docs/events-compatibility.md` for the covered behavior and limitations. These Node-based checks do not replace application-level browser integration testing.
 
-## Development
-
-Tests live in `test/*.test.js` and use Node's built-in `node:test` runner, strict assertions, and native mocks. Run `npm test` for the build, consumer type checks, and full suite; `npm run coverage` retains the existing c8 coverage gate. After building, run `node --test test/model.test.js` for the converted suite alone.
-
-```sh
-npm ci
-npm run build
-npm run lint
-npm run typecheck
-npm test
-npm run coverage
-npm run audit
-```
-
-The npm package publishes the compiled `dist` directory and this README.
-
-## TypeScript development and version 3.0.0 migration
-
-Implementation code now uses strict TypeScript. Builds emit JavaScript, source maps with embedded source, and `.d.ts` declarations into `dist`. JavaScript callers can still use the package without compiling TypeScript themselves. JSDoc comments describe parameters, return values, lifecycle behavior, and validation at the implementation, and are retained in declarations.
-
-```ts
-import {Model, Collection} from 'white-label-model';
-
-const profile = new Model<{name: string}>({name: 'Ada'});
-profile.update({name: 'Grace'});
-const name: string | undefined = profile.get().name;
-// get() returns Partial<T>: delete() can clear every field.
-const profiles = new Collection([profile]);
-```
-
-`Model<T>` describes the object fields. Runtime validation remains necessary for untrusted JSON: TypeScript does not sanitize incoming data. Collections expose unknown members until callers narrow them. `serviceGet`, `servicePost`, `servicePut`, and `servicePatch` are extension hooks that resolve an empty object; they do not perform HTTP requests.
-
-This is a major release because the distribution is now CommonJS emitted by TypeScript, replacing the previous UMD wrapper. CommonJS `require` and the documented ESM imports remain supported. Direct AMD loading or browser script tags that depended on UMD globals must migrate to a browser bundler. Edit `src/*.ts`, then run `npm run build`; do not edit generated `dist` files. The obsolete Babel build dependencies have been removed.
-
-### Verification, coverage, and compatibility
-
-Version 4.0.0 has no runtime dependency on mediator, view, or router. Package tests cover the Model and Collection public contracts independently; consuming applications are responsible for integration testing the package versions they select.
+## Development and verification
 
 ```sh
 npm ci --ignore-scripts
@@ -249,27 +286,12 @@ npm run lint
 npm run typecheck
 npm test
 npm run coverage
+npm run audit
 npm pack --dry-run
 ```
 
-`npm test` builds the code, checks TypeScript consumer examples against the emitted declarations, and runs the tests. `npm run coverage` additionally enforces **100% statements, branches, functions, and lines for each implementation file**. Unexecuted implementation files count toward the result; declaration-only files contain no executable code and are excluded. Reports are written to `coverage`, including `lcov.info` for coverage viewers. CI runs the same gate and checks committed build output for drift.
+`npm run coverage` enforces **100% statements, branches, functions, and lines per implementation file**. CI also rebuilds committed `dist` output and rejects generated-file drift.
 
-Tests exercise the compiled JavaScript interface used by downstream callers. Coverage is an execution metric, not proof that all possible inputs or external integrations are correct.
+Implementation code lives in `src/`; generated JavaScript, source maps, and declarations live in `dist/`. Edit TypeScript sources and regenerate `dist`; do not hand-edit generated output.
 
-To undo this migration, revert its commit and run `npm ci` from the restored lockfile. No npm release, database migration, or production deployment is performed by these development changes.
-### Validate data at runtime
-
-Pass an optional validator when state can originate outside TypeScript:
-
-```ts
-const user = new Model({name: 'Ada'}, value =>
-    typeof value === 'object' && value !== null &&
-    typeof (value as {name?: unknown}).name === 'string'
-);
-```
-
-The validator runs for construction, `set()`, and merged `update()` data. Invalid mutations return `false` and leave existing state unchanged.
-
-## Current behavior notes
-
-`delete()` and `destroy()` clear the model's own state even when its validator rejects an empty object. Previously returned object references are not erased. Collection updates of nested models request a silent child update, then publish the collection's normal notifications once. Nested model-like setters must return `true` to accept an update; `false` or `undefined` rejects it. Silent collection updates emit no notifications. Array appends preserve the backing array and handle large batches without spread-argument limits, including self-appends.
+The package has no runtime dependency on White Label Mediator, View, Router, or Service. Consuming applications own integration testing for the package versions they select.
