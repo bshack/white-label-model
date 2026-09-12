@@ -1,6 +1,6 @@
 // Bundle this file for a browser; see docs/events-compatibility.md.
-const {Model, Collection} = require('..');
-const instances = [new Model(), new Collection()];
+const {Model} = require('..');
+const instances = [new Model(), new Model([]), new Model(new Map())];
 const assert = (value, message) => { if (!value) throw new Error(message); };
 for (const emitter of instances) {
     const calls = [];
