@@ -1,4 +1,3 @@
-/** Observable object and collection constructors, available through ESM and CommonJS imports. */
-import Collection = require('./collection');
+/** Unified observable state constructor for objects, arrays, and Maps. */
 import Model = require('./model');
-export {Model, Collection};
+export {Model};
