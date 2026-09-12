@@ -13,35 +13,7 @@ The package has no DOM or generated HTML. Accessibility and search behavior rema
 
 ## Versioning policy
 
-Backward compatibility is not maintained through aliases, deprecated signatures, placeholder arguments, fallback code paths, or other compatibility shims. Breaking public API changes are communicated with a Semantic Versioning major release and migration notes.
-
-## Version 6 migration
-
-Version 6 replaces the separate `Model` and `Collection` public classes with one `Model` entry point. `Collection` is removed rather than retained as an alias.
-
-```js
-import {Model} from 'white-label-model';
-
-const profile = new Model({name: 'Ada'});
-const tasks = new Model([{id: 1, complete: false}]);
-const people = new Model(new Map([
-    ['ada', {name: 'Ada'}]
-]));
-```
-
-Migrate former collection construction directly:
-
-```js
-// Before
-const tasks = new Collection([]);
-
-// Version 6
-const tasks = new Model([]);
-```
-
-All supported root shapes now use the `model:<name>:<event>` mediator namespace. Arrays and Maps also gain the same lazy deep observation as object state.
-
-Version 6 includes the deep-observation work originally planned for version 5: `get()` returns an observable proxy, and direct nested writes can emit path-specific mutation events without recursively scanning the complete state tree.
+Backward compatibility is not maintained through aliases, deprecated signatures, placeholder arguments, fallback code paths, or other compatibility shims. Breaking public API changes are communicated with a Semantic Versioning major release and migration notes outside this README.
 
 ## Install and import
 
