@@ -1,0 +1,46 @@
+name: Validate unified Model migration
+
+on:
+  push:
+    branches:
+      - feat/deep-change-tracking-20260912
+    paths:
+      - .github/workflows/unified-model-migration.yml
+      - src/**
+      - test/**
+      - test-types/**
+      - package.json
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: npm
+      - run: npm install --package-lock-only --ignore-scripts
+      - run: npm ci --ignore-scripts
+      - run: rm -f dist/collection.js dist/collection.js.map dist/collection.d.ts
+      - run: npm run build
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run coverage
+      - run: npm run audit
+      - run: npm pack --dry-run
+      - name: Commit generated artifacts
+        run: |
+          git add package-lock.json dist
+          git add -u dist
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "Regenerate unified Model artifacts"
+          git push
