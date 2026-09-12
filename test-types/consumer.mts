@@ -17,4 +17,9 @@ const validated = new Model<{name: string}>({name: 'Ada'}, value =>
 );
 validated.set({name: 'Katherine'});
 
+// @ts-expect-error primitive root state is not supported.
+new Model<string>('Ada');
+// @ts-expect-error validators must return a boolean.
+new Model<{name: string}>({name: 'Ada'}, () => 'valid');
+
 void [name, arrayModel.get(), mapModel.get(), validated.get()];
