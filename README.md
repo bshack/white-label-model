@@ -191,43 +191,47 @@ The timing check is a regression guard, not a universal performance guarantee. R
 
 ## Events
 
-Successful non-silent explicit mutations emit `change` followed by their operation-specific event.
+Successful non-silent explicit mutations emit `change` followed by their operation-specific event. The callback data for `change`, `set`, `update`, `push`, `delete`, and `clear` is the complete current state. The `mutate` event uses a structured payload describing the direct proxy mutation.
 
 ```js
-model.on('change', handleAnyChange);
-model.on('set', handleReplacement);
-model.on('update', handleUpdate);
-model.on('push', handleAppend);
-model.on('delete', handleDeletion);
-model.on('clear', handleClear);
-model.on('mutate', handleDirectMutation);
-```
-
-Operation-specific listeners receive the complete current state. Direct proxy mutation listeners receive a structured payload describing exactly what changed. For example:
-
-```js
-const profile = new Model({
-    preferences: {theme: 'light'}
+model.on('change', state => {
+    // state => {name: 'Grace'}
 });
 
-let callbackData;
-profile.on('mutate', payload => {
-    callbackData = payload;
+model.on('set', state => {
+    // state => {name: 'Grace'}
 });
 
-profile.get().preferences.theme = 'dark'; // => 'dark'
+model.on('update', state => {
+    // state => {name: 'Grace'}
+});
 
-callbackData;
-// => {
-//      operation: 'set',
-//      path: ['preferences', 'theme'],
-//      oldValue: 'light',
-//      newValue: 'dark',
-//      state: {
-//          preferences: {theme: 'dark'}
-//      }
-//    }
+model.on('push', state => {
+    // state => [{id: 1}, {id: 2}]
+});
+
+model.on('delete', state => {
+    // state => [{id: 2}]
+});
+
+model.on('clear', state => {
+    // state => []
+});
+
+model.on('mutate', payload => {
+    // payload => {
+    //     operation: 'set',
+    //     path: ['preferences', 'theme'],
+    //     oldValue: 'light',
+    //     newValue: 'dark',
+    //     state: {
+    //         preferences: {theme: 'dark'}
+    //     }
+    // }
+});
 ```
+
+The state examples above illustrate the callback shape for each binding; the exact state reflects the model at the time that event is emitted.
 
 Remove a listener with the same callback reference:
 
