@@ -18,7 +18,7 @@ White Label imports `events`. Node resolves that name to its built-in EventEmitt
 - Unhandled `error` events throw; handled errors reach their listeners; exceptions thrown by listeners propagate synchronously.
 - Listener argument validation and per-instance maximum-listener settings.
 
-The package-specific cases also cover lifecycle cleanup. Model/Collection cases cover mutation order, full-state payload identity, silent mutations, invalid Model updates, array/Map collections, and local/namespaced relay using each combination of the two event backends. State teardown must not unsubscribe unrelated mediator listeners.
+The package-specific cases also cover lifecycle cleanup. Unified Model cases cover mutation order, full-state payload identity, silent mutations, invalid updates, plain-object/array/Map roots, and local/namespaced relay using each combination of the two event backends. State teardown must not unsubscribe unrelated mediator listeners.
 
 This is a regression contract for existing behavior, not a complete implementation of every Node EventEmitter feature. Newer Node-only static helpers, promise rejection capture, exact diagnostics/warning delivery, and every overload are not asserted to work in browsers. Public types inherited from current Node declarations are not by themselves evidence of browser support.
 

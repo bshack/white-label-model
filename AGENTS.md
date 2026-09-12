@@ -2,7 +2,7 @@
 
 # Repository Guide — white-label-model
 
-Observable object and array/Map collection state with mutation events and optional validation.
+One observable Model for plain-object, array, or Map state with mutation events and optional validation.
 
 Verified against `package.json`, `README.md`, and `.github/workflows/security.yml` on September 11, 2026. Recheck those files when commands or supported environments change.
 
@@ -37,7 +37,7 @@ Edit TypeScript sources and regenerate tracked `dist/` output with the existing 
 
 ## Architectural boundaries
 
-Preserve mutation return values, silent-event semantics, full-state event payloads, and array/Map behavior. Model state is deeply observable through lazy proxies: keep nested change tracking path-based and do not introduce whole-model deep scans or diffs. Keep runtime validation separate from TypeScript types. Service hooks do not perform HTTP requests unless an application overrides them.
+Preserve the single public Model entry point, mutation return values, silent-event semantics, full-state event payloads, and object/array/Map behavior. Do not reintroduce a separate Collection class or compatibility alias. Model state is deeply observable through lazy proxies: keep nested change tracking path-based and do not introduce whole-model deep scans or diffs. Keep runtime validation separate from TypeScript types. Service hooks do not perform HTTP requests unless an application overrides them.
 
 ---
 
