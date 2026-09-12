@@ -11,6 +11,7 @@ function measure(callback) {
     return performance.now() - start;
 }
 
+// These thresholds are regression guards for accidental whole-container copies, not absolute performance guarantees.
 test('unvalidated Map point mutations stay effectively independent of collection size', () => {
     const entries = Array.from({length: 20000}, (_, index) => [index, index]);
     const model = new Model(new Map(entries));
