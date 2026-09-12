@@ -2,6 +2,25 @@
 import Utilities = require('./utilities');
 /** Supported root-state containers. */
 type ModelData = Record<PropertyKey, unknown> | unknown[] | Map<unknown, unknown>;
+/** Property-level mutation details emitted by deeply observable model state. */
+interface ModelMutation<T extends ModelData> {
+    operation: 'set' | 'delete' | 'clear';
+    path: ReadonlyArray<unknown>;
+    oldValue: unknown;
+    newValue: unknown;
+    state: T;
+}
+interface ModelEvents<T extends ModelData> {
+    change: [state: T];
+    mutate: [mutation: ModelMutation<T>];
+    set: [state: T];
+    update: [state: T];
+    push: [state: T];
+    delete: [state: T];
+    clear: [state: T];
+}
+type ModelEventName<T extends ModelData> = keyof ModelEvents<T>;
+type ModelEventArguments<T extends ModelData, Name extends ModelEventName<T>> = ModelEvents<T>[Name];
 /** Mutable object, array, or Map state with synchronous change notifications. */
 declare class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
     modelData: T;
@@ -56,5 +75,14 @@ declare class Model<T extends ModelData = Record<string, unknown>> extends Utili
     servicePatch(): Promise<{}>;
     servicePost(): Promise<{}>;
     servicePut(): Promise<{}>;
+}
+/** Compile-time event contracts without adding runtime EventEmitter wrappers. */
+interface Model<T extends ModelData = Record<string, unknown>> {
+    on<Name extends ModelEventName<T>>(eventName: Name, listener: (...arguments_: ModelEventArguments<T, Name>) => void): this;
+    once<Name extends ModelEventName<T>>(eventName: Name, listener: (...arguments_: ModelEventArguments<T, Name>) => void): this;
+    addListener<Name extends ModelEventName<T>>(eventName: Name, listener: (...arguments_: ModelEventArguments<T, Name>) => void): this;
+    off<Name extends ModelEventName<T>>(eventName: Name, listener: (...arguments_: ModelEventArguments<T, Name>) => void): this;
+    removeListener<Name extends ModelEventName<T>>(eventName: Name, listener: (...arguments_: ModelEventArguments<T, Name>) => void): this;
+    emit<Name extends ModelEventName<T>>(eventName: Name, ...arguments_: ModelEventArguments<T, Name>): boolean;
 }
 export = Model;
