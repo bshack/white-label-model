@@ -212,6 +212,7 @@ Tests live in `test/*.test.js` and use Node's built-in `node:test` runner, stric
 ```sh
 npm ci
 npm run build
+npm run lint
 npm run typecheck
 npm test
 npm run coverage
@@ -238,14 +239,13 @@ const profiles = new Collection([profile]);
 
 This is a major release because the distribution is now CommonJS emitted by TypeScript, replacing the previous UMD wrapper. CommonJS `require` and the documented ESM imports remain supported. Direct AMD loading or browser script tags that depended on UMD globals must migrate to a browser bundler. Edit `src/*.ts`, then run `npm run build`; do not edit generated `dist` files. The obsolete Babel build dependencies have been removed.
 
-### Verification and coverage
+### Verification, coverage, and compatibility
 
-## Tested compatibility
-
-Version 3.1 is tested with mediator 3.x, view 4.x, and router 4.x. The packages do not require one another at runtime.
+Version 4.0.0 has no runtime dependency on mediator, view, or router. Package tests cover the Model and Collection public contracts independently; consuming applications are responsible for integration testing the package versions they select.
 
 ```sh
 npm ci --ignore-scripts
+npm run lint
 npm run typecheck
 npm test
 npm run coverage
@@ -270,6 +270,6 @@ const user = new Model({name: 'Ada'}, value =>
 
 The validator runs for construction, `set()`, and merged `update()` data. Invalid mutations return `false` and leave existing state unchanged.
 
-## Unreleased review fixes
+## Current behavior notes
 
 `delete()` and `destroy()` clear the model's own state even when its validator rejects an empty object. Previously returned object references are not erased. Collection updates of nested models request a silent child update, then publish the collection's normal notifications once. Nested model-like setters must return `true` to accept an update; `false` or `undefined` rejects it. Silent collection updates emit no notifications. Array appends preserve the backing array and handle large batches without spread-argument limits, including self-appends.
