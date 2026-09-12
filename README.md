@@ -9,10 +9,6 @@
 - Native `Proxy` support for deep observation
 - Native `Map` support when using `Map` state
 
-## Versioning policy
-
-Backward compatibility is not maintained through aliases, deprecated signatures, placeholder arguments, fallback code paths, or other compatibility shims. Breaking public API changes are communicated with a Semantic Versioning major release and release notes outside this README.
-
 ## Install and import
 
 ```sh
