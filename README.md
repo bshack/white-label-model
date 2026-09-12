@@ -136,12 +136,35 @@ const model = new Model({
     }
 });
 
-model.on('mutate', ({operation, path, oldValue, newValue, state}) => {
-    console.log(operation, path, oldValue, newValue, state);
+let mutation;
+model.on('mutate', payload => {
+    mutation = payload;
 });
 
-model.get().user.profile.preferences.theme = 'dark';
-// path: ['user', 'profile', 'preferences', 'theme']
+model.get().user.profile.preferences.theme = 'dark'; // => 'dark'
+model.get();
+// => {
+//      user: {
+//          profile: {
+//              preferences: {theme: 'dark'}
+//          }
+//      }
+//    }
+
+mutation;
+// => {
+//      operation: 'set',
+//      path: ['user', 'profile', 'preferences', 'theme'],
+//      oldValue: 'light',
+//      newValue: 'dark',
+//      state: {
+//          user: {
+//              profile: {
+//                  preferences: {theme: 'dark'}
+//              }
+//          }
+//      }
+//    }
 ```
 
 A changed direct property write emits:
