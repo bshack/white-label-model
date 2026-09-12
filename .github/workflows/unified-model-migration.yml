@@ -32,6 +32,8 @@ jobs:
           path = Path('src/model.ts')
           text = path.read_text()
           text = text.replace('private isObservable(value: unknown): value is object {', 'private isObservable(value: unknown): value is ModelData {')
+          text = text.replace('        let proxy: Map<unknown, unknown>;\n', '')
+          text = text.replace('        proxy = new Proxy(value, {', '        const proxy = new Proxy(value, {')
           path.write_text(text)
           PY
           rm -f dist/collection.js dist/collection.js.map dist/collection.d.ts
