@@ -31,6 +31,9 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
         if (!this.isSupportedData(initial)) {
             throw new TypeError('Model data must be a plain object, array, or Map.');
         }
+        if (!this.accepts(initial)) {
+            throw new TypeError('Initial model data failed validation.');
+        }
         this.modelData = this.observe(initial, []) as T;
         this.label = 'model';
         this.mediator = false;
@@ -63,7 +66,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
     }
 
     /** Return whether a nested value should participate in deep change tracking. */
-    private isObservable(value: unknown): value is object {
+    private isObservable(value: unknown): value is ModelData {
         return Array.isArray(value) || this.isMap(value) || this.isPlainObject(value);
     }
 
@@ -154,7 +157,6 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
     /** Observe Map values and mutators without scanning unrelated entries. */
     private observeMap(value: Map<unknown, unknown>, path: unknown[]): Map<unknown, unknown> {
         const childCache = new Map<unknown, {raw: object; proxy: object}>();
-        let proxy: Map<unknown, unknown>;
         const observeValue = (key: unknown, item: unknown): unknown => {
             const rawItem = this.toRaw(item);
             if (!this.isObservable(rawItem)) {
@@ -168,7 +170,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
             childCache.set(key, {raw: rawItem, proxy: childProxy});
             return childProxy;
         };
-        proxy = new Proxy(value, {
+        const proxy = new Proxy(value, {
             get: (target, property) => {
                 if (property === 'size') {
                     return target.size;
@@ -293,8 +295,13 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
             if (!this.accepts(candidate)) {
                 return false;
             }
-            return this.set(candidate, dataOrSilent === true) &&
-                (dataOrSilent === true || this.message(['update'], this.get()));
+            if (!this.set(candidate, true)) {
+                return false;
+            }
+            if (dataOrSilent !== true) {
+                this.message(['change', 'update'], this.get());
+            }
+            return true;
         }
 
         if (arguments.length < 2) {
@@ -338,12 +345,21 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
             if (arguments.length > 2 || (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean') || key === undefined) {
                 return false;
             }
-            const additions = Array.isArray(key) ? key.map(item => this.toRaw(item)) : [this.toRaw(key)];
+            const additions: unknown[] = [];
+            if (Array.isArray(key)) {
+                for (let index = 0; index < key.length; index += 1) {
+                    additions.push(this.toRaw(key[index]));
+                }
+            } else {
+                additions.push(this.toRaw(key));
+            }
             const candidate = raw.concat(additions);
             if (!this.accepts(candidate)) {
                 return false;
             }
-            additions.forEach(item => raw.push(item));
+            for (let index = 0; index < additions.length; index += 1) {
+                raw.push(additions[index]);
+            }
             if (dataOrSilent !== true) {
                 this.message(['change', 'push'], this.get());
             }

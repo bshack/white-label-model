@@ -1,64 +1,68 @@
 "use strict";
 /** @module src/model */
 const Utilities = require("./utilities");
-/** Mutable plain-object state with synchronous change notifications. */
+/** Mutable object, array, or Map state with synchronous change notifications. */
 class Model extends Utilities {
-    modelData = {};
+    modelData;
     validator;
     proxyTargets = new WeakMap();
     /**
-     * Create an instance with its own state and listener references.
-     * @param modelData - Initial plain-object fields.
+     * Create one observable state container for a plain object, array, or Map.
+     * @param modelData - Initial state; omitted state defaults to an empty object.
+     * @param validator - Optional whole-state validator for explicit set/update/push/delete operations.
      */
     constructor(modelData, validator) {
         super();
         this.validator = validator;
-        // where the data is held for the model
-        if (modelData && this.isPlainObject(modelData)) {
-            this.set(modelData);
+        const initial = modelData === undefined ? {} : modelData;
+        if (!this.isSupportedData(initial)) {
+            throw new TypeError('Model data must be a plain object, array, or Map.');
         }
-        else {
-            this.set(new Object());
+        if (!this.accepts(initial)) {
+            throw new TypeError('Initial model data failed validation.');
         }
+        this.modelData = this.observe(initial, []);
         this.label = 'model';
-        // optionally add in a mediator when extended
         this.mediator = false;
-        // name for this model instance be used in mediator emit. Required on when using a mediator
         this.name = false;
     }
-    /**
-     * Start this instance and return it for lifecycle chaining.
-     * @returns This instance for chaining.
-     */
+    /** Start this instance and return it for lifecycle chaining. */
     initialize() {
         return this;
     }
-    /**
-     * Release owned state and listeners so the instance can leave the application lifecycle.
-     * @returns This instance after cleanup.
-     */
+    /** Release owned state and listeners so the instance can leave the application lifecycle. */
     destroy() {
-        //delete all the data
-        this.delete(true);
-        // remove all node events
+        this.clear(true);
         this.removeAllListeners();
         return this;
     }
-    /** Return the raw object behind one of this model's observable proxies. */
+    /** Return the raw target behind one of this model's observable proxies. */
     toRaw(value) {
         if (value && typeof value === 'object') {
             return this.proxyTargets.get(value) || value;
         }
         return value;
     }
+    /** Return whether a value is a supported root-state container. */
+    isSupportedData(value) {
+        return Array.isArray(value) || this.isMap(value) || this.isPlainObject(value);
+    }
     /** Return whether a nested value should participate in deep change tracking. */
     isObservable(value) {
-        return Array.isArray(value) || this.isPlainObject(value);
+        return Array.isArray(value) || this.isMap(value) || this.isPlainObject(value);
     }
-    /** Prevent direct proxy writes from bypassing the same dangerous keys blocked by update(). */
+    /** Prevent direct object writes from using prototype-pollution keys. */
     isBlockedKey(property) {
         return typeof property === 'string' &&
             (property === '__proto__' || property === 'constructor' || property === 'prototype');
+    }
+    /** Return the raw root container. */
+    rawState() {
+        return this.toRaw(this.modelData);
+    }
+    /** Apply the optional validator to an explicit candidate state. */
+    accepts(candidate) {
+        return !this.validator || this.validator(candidate);
     }
     /** Emit the existing full-state change event plus a path-specific mutation event. */
     notifyMutation(operation, path, oldValue, newValue) {
@@ -73,11 +77,8 @@ class Model extends Utilities {
         this.message(['change'], state);
         this.message(['mutate'], mutation);
     }
-    /**
-     * Wrap one object lazily so reads only proxy the branch being accessed.
-     * No full-tree traversal or deep comparison occurs when state changes.
-     */
-    observe(value, path) {
+    /** Observe plain objects and arrays lazily along accessed branches. */
+    observeObject(value, path) {
         const childCache = new Map();
         const proxy = new Proxy(value, {
             get: (target, property, receiver) => {
@@ -124,108 +125,301 @@ class Model extends Utilities {
         this.proxyTargets.set(proxy, value);
         return proxy;
     }
-    // the setter
-    /**
-     * Replace stored data when it has a supported shape; optionally suppress change notifications.
-     * @param data - Data supplied by the caller; validation follows the method contract.
-     * @param silent - Suppress mutation notifications when true.
-     * @returns True when data was accepted; false for an unsupported shape.
-     */
+    /** Observe Map values and mutators without scanning unrelated entries. */
+    observeMap(value, path) {
+        const childCache = new Map();
+        const observeValue = (key, item) => {
+            const rawItem = this.toRaw(item);
+            if (!this.isObservable(rawItem)) {
+                return item;
+            }
+            const cached = childCache.get(key);
+            if (cached && cached.raw === rawItem) {
+                return cached.proxy;
+            }
+            const childProxy = this.observe(rawItem, path.concat(key));
+            childCache.set(key, { raw: rawItem, proxy: childProxy });
+            return childProxy;
+        };
+        const proxy = new Proxy(value, {
+            get: (target, property) => {
+                if (property === 'size') {
+                    return target.size;
+                }
+                if (property === 'get') {
+                    return (key) => observeValue(key, target.get(key));
+                }
+                if (property === 'set') {
+                    return (key, nextValue) => {
+                        const rawNextValue = this.toRaw(nextValue);
+                        const hadKey = target.has(key);
+                        const oldValue = this.toRaw(target.get(key));
+                        if (hadKey && Object.is(oldValue, rawNextValue)) {
+                            return proxy;
+                        }
+                        target.set(key, rawNextValue);
+                        this.notifyMutation('set', path.concat(key), oldValue, rawNextValue);
+                        return proxy;
+                    };
+                }
+                if (property === 'delete') {
+                    return (key) => {
+                        if (!target.has(key)) {
+                            return false;
+                        }
+                        const oldValue = this.toRaw(target.get(key));
+                        const removed = target.delete(key);
+                        if (removed) {
+                            childCache.delete(key);
+                            this.notifyMutation('delete', path.concat(key), oldValue, undefined);
+                        }
+                        return removed;
+                    };
+                }
+                if (property === 'clear') {
+                    return () => {
+                        if (target.size === 0) {
+                            return;
+                        }
+                        const oldValue = new Map(target);
+                        target.clear();
+                        childCache.clear();
+                        this.notifyMutation('clear', path, oldValue, target);
+                    };
+                }
+                if (property === 'forEach') {
+                    return (callback, thisArg) => {
+                        target.forEach((item, key) => callback.call(thisArg, observeValue(key, item), key, proxy));
+                    };
+                }
+                if (property === 'values') {
+                    return function* () {
+                        for (const [key, item] of target.entries()) {
+                            yield observeValue(key, item);
+                        }
+                    };
+                }
+                if (property === 'entries' || property === Symbol.iterator) {
+                    return function* () {
+                        for (const [key, item] of target.entries()) {
+                            yield [key, observeValue(key, item)];
+                        }
+                    };
+                }
+                const result = Reflect.get(target, property, target);
+                return typeof result === 'function' ? result.bind(target) : result;
+            }
+        });
+        this.proxyTargets.set(proxy, value);
+        return proxy;
+    }
+    /** Wrap one supported container lazily so mutations never require a full-tree scan. */
+    observe(value, path) {
+        return this.isMap(value) ? this.observeMap(value, path) : this.observeObject(value, path);
+    }
+    /** Replace all model state. */
     set(data, silent = false) {
         const rawData = this.toRaw(data);
-        if (rawData && this.isPlainObject(rawData) && (!this.validator || this.validator(rawData))) {
-            this.modelData = this.observe(rawData, []);
-            if (!silent) {
-                this.message(['change', 'set'], this.get());
-            }
-            return true;
-        }
-        else {
+        if (!this.isSupportedData(rawData) || !this.accepts(rawData)) {
             return false;
         }
+        this.modelData = this.observe(rawData, []);
+        if (!silent) {
+            this.message(['change', 'set'], this.get());
+        }
+        return true;
     }
-    // the getter
-    /**
-     * Return deeply observable model data without cloning it.
-     * Direct property writes and deletes emit change and mutate events.
-     * @returns The observable backing data container.
-     */
-    get() {
-        return this.modelData;
+    /** Return all state or one object property, array index, or Map entry. */
+    get(key) {
+        if (arguments.length === 0) {
+            return this.modelData;
+        }
+        if (this.isMap(this.modelData)) {
+            return this.modelData.get(key);
+        }
+        if (Array.isArray(this.modelData)) {
+            return Number.isInteger(key) ? this.modelData[key] : undefined;
+        }
+        if (typeof key === 'string' || typeof key === 'symbol' || typeof key === 'number') {
+            return Reflect.get(this.modelData, typeof key === 'number' ? String(key) : key);
+        }
+        return undefined;
     }
-    // the updater
     /**
-     * Merge object fields or replace a collection member, retaining the existing mutation contract.
-     * @param updateData - New fields or replacement data.
-     * @param silent - Suppress mutation notifications when true.
-     * @returns True when an update was applied; false when it could not be applied.
+     * Shallow-merge a plain-object root, or replace/merge one existing array or Map member.
+     * Object form: update(partial, silent?). Collection form: update(keyOrIndex, value, silent?).
      */
-    update(updateData, silent = false) {
-        if (updateData && this.isPlainObject(updateData)) {
-            if (!this.set(this.extend(this.get(), updateData), true)) {
+    update(keyOrData, dataOrSilent, silent = false) {
+        const raw = this.rawState();
+        if (this.isPlainObject(raw)) {
+            if (!this.isPlainObject(keyOrData) ||
+                (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean') || arguments.length > 2) {
                 return false;
             }
-            if (!silent) {
+            const candidate = this.extend(raw, keyOrData);
+            if (!this.accepts(candidate)) {
+                return false;
+            }
+            if (!this.set(candidate, true)) {
+                return false;
+            }
+            if (dataOrSilent !== true) {
                 this.message(['change', 'update'], this.get());
             }
             return true;
         }
-        else {
+        if (arguments.length < 2) {
             return false;
         }
+        const isMapState = this.isMap(raw);
+        const hasItem = isMapState
+            ? raw.has(keyOrData)
+            : Number.isInteger(keyOrData) && keyOrData >= 0 && keyOrData < raw.length;
+        if (!hasItem) {
+            return false;
+        }
+        const current = isMapState ? raw.get(keyOrData) : raw[keyOrData];
+        const nextValue = this.isPlainObject(current) && this.isPlainObject(dataOrSilent)
+            ? this.extend(current, dataOrSilent)
+            : this.toRaw(dataOrSilent);
+        const candidate = isMapState ? new Map(raw) : raw.slice();
+        if (isMapState) {
+            candidate.set(keyOrData, nextValue);
+        }
+        else {
+            candidate[keyOrData] = nextValue;
+        }
+        if (!this.accepts(candidate)) {
+            return false;
+        }
+        if (isMapState) {
+            raw.set(keyOrData, nextValue);
+        }
+        else {
+            raw[keyOrData] = nextValue;
+        }
+        if (!silent) {
+            this.message(['change', 'update'], this.get());
+        }
+        return true;
     }
-    // the deleter
-    /**
-     * Remove stored data and notify subscribers unless silent mode is requested.
-     * @param silent - Suppress mutation notifications when true.
-     * @returns True when data was removed or cleared; false for a missing member.
-     */
-    delete(silent = false) {
-        // Clearing owned state must not be rejected by an acceptance validator.
-        this.modelData = this.observe({}, []);
+    /** Append array values or insert Map entries. Returns false for plain-object state. */
+    push(key, dataOrSilent, silent = false) {
+        const raw = this.rawState();
+        if (Array.isArray(raw)) {
+            if (arguments.length > 2 || (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean') || key === undefined) {
+                return false;
+            }
+            const additions = [];
+            if (Array.isArray(key)) {
+                for (let index = 0; index < key.length; index += 1) {
+                    additions.push(this.toRaw(key[index]));
+                }
+            }
+            else {
+                additions.push(this.toRaw(key));
+            }
+            const candidate = raw.concat(additions);
+            if (!this.accepts(candidate)) {
+                return false;
+            }
+            for (let index = 0; index < additions.length; index += 1) {
+                raw.push(additions[index]);
+            }
+            if (dataOrSilent !== true) {
+                this.message(['change', 'push'], this.get());
+            }
+            return true;
+        }
+        if (!this.isMap(raw)) {
+            return false;
+        }
+        if (this.isMap(key)) {
+            if (arguments.length > 2 || (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean')) {
+                return false;
+            }
+            const candidate = new Map(raw);
+            key.forEach((value, mapKey) => candidate.set(mapKey, this.toRaw(value)));
+            if (!this.accepts(candidate)) {
+                return false;
+            }
+            candidate.forEach((value, mapKey) => raw.set(mapKey, value));
+            if (dataOrSilent !== true) {
+                this.message(['change', 'push'], this.get());
+            }
+            return true;
+        }
+        if (arguments.length < 2) {
+            return false;
+        }
+        const candidate = new Map(raw);
+        candidate.set(key, this.toRaw(dataOrSilent));
+        if (!this.accepts(candidate)) {
+            return false;
+        }
+        raw.set(key, this.toRaw(dataOrSilent));
+        if (!silent) {
+            this.message(['change', 'push'], this.get());
+        }
+        return true;
+    }
+    /** Delete one property, array index, or Map entry. Use clear() to empty all state. */
+    delete(key, silent = false) {
+        const raw = this.rawState();
+        let candidate;
+        if (this.isMap(raw)) {
+            if (!raw.has(key)) {
+                return false;
+            }
+            candidate = new Map(raw);
+            candidate.delete(key);
+        }
+        else if (Array.isArray(raw)) {
+            if (!Number.isInteger(key) || key < 0 || key >= raw.length) {
+                return false;
+            }
+            candidate = raw.slice();
+            candidate.splice(key, 1);
+        }
+        else {
+            if ((typeof key !== 'string' && typeof key !== 'symbol' && typeof key !== 'number') ||
+                !Object.prototype.hasOwnProperty.call(raw, key)) {
+                return false;
+            }
+            candidate = { ...raw };
+            Reflect.deleteProperty(candidate, typeof key === 'number' ? String(key) : key);
+        }
+        if (!this.accepts(candidate)) {
+            return false;
+        }
+        if (this.isMap(raw)) {
+            raw.delete(key);
+        }
+        else if (Array.isArray(raw)) {
+            raw.splice(key, 1);
+        }
+        else {
+            Reflect.deleteProperty(raw, typeof key === 'number' ? String(key) : key);
+        }
         if (!silent) {
             this.message(['change', 'delete'], this.get());
         }
         return true;
     }
-    //sub service request methods
-    /**
-     * Extension hook for a future GET transport; the default resolves an empty object without I/O.
-     * @returns A promise resolving to an empty object; override to supply a transport.
-     */
-    serviceGet() {
-        return new Promise((resolve, reject) => {
-            resolve({});
-        });
+    /** Clear all state while preserving its object, array, or Map shape. */
+    clear(silent = false) {
+        const raw = this.rawState();
+        const empty = this.isMap(raw) ? new Map() : Array.isArray(raw) ? [] : {};
+        this.modelData = this.observe(empty, []);
+        if (!silent) {
+            this.message(['change', 'clear'], this.get());
+        }
+        return true;
     }
-    /**
-     * Extension hook for a future PATCH transport; the default resolves an empty object without I/O.
-     * @returns A promise resolving to an empty object; override to supply a transport.
-     */
-    servicePatch() {
-        return new Promise((resolve, reject) => {
-            resolve({});
-        });
-    }
-    /**
-     * Extension hook for a future POST transport; the default resolves an empty object without I/O.
-     * @returns A promise resolving to an empty object; override to supply a transport.
-     */
-    servicePost() {
-        return new Promise((resolve, reject) => {
-            resolve({});
-        });
-    }
-    /**
-     * Extension hook for a future PUT transport; the default resolves an empty object without I/O.
-     * @returns A promise resolving to an empty object; override to supply a transport.
-     */
-    servicePut() {
-        return new Promise((resolve, reject) => {
-            resolve({});
-        });
-    }
+    serviceGet() { return Promise.resolve({}); }
+    servicePatch() { return Promise.resolve({}); }
+    servicePost() { return Promise.resolve({}); }
+    servicePut() { return Promise.resolve({}); }
 }
-;
 module.exports = Model;
 //# sourceMappingURL=model.js.map

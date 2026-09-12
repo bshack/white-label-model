@@ -1,83 +1,60 @@
 /** @module src/model */
 import Utilities = require('./utilities');
-/** Mutable plain-object state with synchronous change notifications. */
-declare class Model<T extends object = Record<string, unknown>> extends Utilities {
-    modelData: Partial<T>;
+/** Supported root-state containers. */
+type ModelData = Record<PropertyKey, unknown> | unknown[] | Map<unknown, unknown>;
+/** Mutable object, array, or Map state with synchronous change notifications. */
+declare class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
+    modelData: T;
     validator: ((data: unknown) => boolean) | undefined;
     private readonly proxyTargets;
     /**
-     * Create an instance with its own state and listener references.
-     * @param modelData - Initial plain-object fields.
+     * Create one observable state container for a plain object, array, or Map.
+     * @param modelData - Initial state; omitted state defaults to an empty object.
+     * @param validator - Optional whole-state validator for explicit set/update/push/delete operations.
      */
     constructor(modelData?: T, validator?: (data: unknown) => boolean);
-    /**
-     * Start this instance and return it for lifecycle chaining.
-     * @returns This instance for chaining.
-     */
+    /** Start this instance and return it for lifecycle chaining. */
     initialize(): this;
-    /**
-     * Release owned state and listeners so the instance can leave the application lifecycle.
-     * @returns This instance after cleanup.
-     */
+    /** Release owned state and listeners so the instance can leave the application lifecycle. */
     destroy(): this;
-    /** Return the raw object behind one of this model's observable proxies. */
+    /** Return the raw target behind one of this model's observable proxies. */
     private toRaw;
+    /** Return whether a value is a supported root-state container. */
+    private isSupportedData;
     /** Return whether a nested value should participate in deep change tracking. */
     private isObservable;
-    /** Prevent direct proxy writes from bypassing the same dangerous keys blocked by update(). */
+    /** Prevent direct object writes from using prototype-pollution keys. */
     private isBlockedKey;
+    /** Return the raw root container. */
+    private rawState;
+    /** Apply the optional validator to an explicit candidate state. */
+    private accepts;
     /** Emit the existing full-state change event plus a path-specific mutation event. */
     private notifyMutation;
-    /**
-     * Wrap one object lazily so reads only proxy the branch being accessed.
-     * No full-tree traversal or deep comparison occurs when state changes.
-     */
+    /** Observe plain objects and arrays lazily along accessed branches. */
+    private observeObject;
+    /** Observe Map values and mutators without scanning unrelated entries. */
+    private observeMap;
+    /** Wrap one supported container lazily so mutations never require a full-tree scan. */
     private observe;
-    /**
-     * Replace stored data when it has a supported shape; optionally suppress change notifications.
-     * @param data - Data supplied by the caller; validation follows the method contract.
-     * @param silent - Suppress mutation notifications when true.
-     * @returns True when data was accepted; false for an unsupported shape.
-     */
+    /** Replace all model state. */
     set(data: unknown, silent?: boolean): boolean;
+    get(): T;
+    get(key: unknown): unknown;
     /**
-     * Return deeply observable model data without cloning it.
-     * Direct property writes and deletes emit change and mutate events.
-     * @returns The observable backing data container.
+     * Shallow-merge a plain-object root, or replace/merge one existing array or Map member.
+     * Object form: update(partial, silent?). Collection form: update(keyOrIndex, value, silent?).
      */
-    get(): Partial<T>;
-    /**
-     * Merge object fields or replace a collection member, retaining the existing mutation contract.
-     * @param updateData - New fields or replacement data.
-     * @param silent - Suppress mutation notifications when true.
-     * @returns True when an update was applied; false when it could not be applied.
-     */
-    update(updateData: Partial<T>, silent?: boolean): boolean;
-    /**
-     * Remove stored data and notify subscribers unless silent mode is requested.
-     * @param silent - Suppress mutation notifications when true.
-     * @returns True when data was removed or cleared; false for a missing member.
-     */
-    delete(silent?: boolean): boolean;
-    /**
-     * Extension hook for a future GET transport; the default resolves an empty object without I/O.
-     * @returns A promise resolving to an empty object; override to supply a transport.
-     */
-    serviceGet(): Promise<unknown>;
-    /**
-     * Extension hook for a future PATCH transport; the default resolves an empty object without I/O.
-     * @returns A promise resolving to an empty object; override to supply a transport.
-     */
-    servicePatch(): Promise<unknown>;
-    /**
-     * Extension hook for a future POST transport; the default resolves an empty object without I/O.
-     * @returns A promise resolving to an empty object; override to supply a transport.
-     */
-    servicePost(): Promise<unknown>;
-    /**
-     * Extension hook for a future PUT transport; the default resolves an empty object without I/O.
-     * @returns A promise resolving to an empty object; override to supply a transport.
-     */
-    servicePut(): Promise<unknown>;
+    update(keyOrData: unknown, dataOrSilent?: unknown, silent?: boolean): boolean;
+    /** Append array values or insert Map entries. Returns false for plain-object state. */
+    push(key: unknown, dataOrSilent?: unknown, silent?: boolean): boolean;
+    /** Delete one property, array index, or Map entry. Use clear() to empty all state. */
+    delete(key: unknown, silent?: boolean): boolean;
+    /** Clear all state while preserving its object, array, or Map shape. */
+    clear(silent?: boolean): boolean;
+    serviceGet(): Promise<{}>;
+    servicePatch(): Promise<{}>;
+    servicePost(): Promise<{}>;
+    servicePut(): Promise<{}>;
 }
 export = Model;
