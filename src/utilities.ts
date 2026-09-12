@@ -69,31 +69,34 @@ class Utilities extends EventEmitter {
     }
 
     /**
-     * Create a shallow merge using own properties while blocking prototype-pollution keys.
+     * Create a shallow merge using enumerable own properties while blocking prototype-pollution keys.
+     * The earlier source's prototype is retained so null-prototype state remains null-prototype state.
      * @param object1 - Earlier merge source; null is ignored.
      * @param object2 - Later merge source; null is ignored.
      * @returns A new merged object without blocked prototype keys.
      */
     extend(object1: Record<string, unknown> | null, object2: Record<string, unknown> | null): Record<string, unknown> {
-        // Copy only own, safe properties into a new object. In particular,
+        // Copy only enumerable own, safe properties into a new object. In particular,
         // never treat attacker-controlled prototype keys as data or mutate
         // a caller-owned object while applying an update.
-        const result: Record<string, unknown> = {};
-        const blockedKeys = ['__proto__', 'constructor', 'prototype'];
+        const prototype = object1 ? Object.getPrototypeOf(object1) : Object.prototype;
+        const result = Object.create(prototype) as Record<PropertyKey, unknown>;
+        const blockedKeys = new Set(['__proto__', 'constructor', 'prototype']);
 
         [object1, object2].forEach((source) => {
             if (!source) {
                 return;
             }
 
-            Object.keys(source).forEach((key) => {
-                if (blockedKeys.indexOf(key) === -1) {
-                    result[key] = source[key];
+            Reflect.ownKeys(source).forEach((key) => {
+                if ((typeof key !== 'string' || !blockedKeys.has(key)) &&
+                    Object.prototype.propertyIsEnumerable.call(source, key)) {
+                    result[key] = (source as Record<PropertyKey, unknown>)[key];
                 }
             });
         });
 
-        return result;
+        return result as Record<string, unknown>;
     }
 
     /**
