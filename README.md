@@ -311,3 +311,5 @@ npm pack --dry-run
 `npm run coverage` enforces **100% statements, branches, functions, and lines per implementation file**. CI also rebuilds committed `dist` output and rejects generated-file drift.
 
 Implementation code lives in `src/`; generated JavaScript, source maps, and declarations live in `dist/`. Edit TypeScript sources and regenerate `dist`; do not hand-edit generated output.
+
+The package can be installed and used independently; it has no runtime dependency on the other White Label packages.
