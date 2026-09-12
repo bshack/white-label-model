@@ -13,7 +13,7 @@ The package has no DOM or generated HTML. Accessibility and search behavior rema
 
 ## Versioning policy
 
-Backward compatibility is not maintained through aliases, deprecated signatures, placeholder arguments, fallback code paths, or other compatibility shims. Breaking public API changes are communicated with a Semantic Versioning major release and migration notes outside this README.
+Backward compatibility is not maintained through aliases, deprecated signatures, placeholder arguments, fallback code paths, or other compatibility shims. Breaking public API changes are communicated with a Semantic Versioning major release and release notes outside this README.
 
 ## Install and import
 
