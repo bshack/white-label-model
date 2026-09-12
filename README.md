@@ -203,23 +203,31 @@ model.on('clear', handleClear);
 model.on('mutate', handleDirectMutation);
 ```
 
-Operation-specific listeners receive the complete current state. For example:
+Operation-specific listeners receive the complete current state. Direct proxy mutation listeners receive a structured payload describing exactly what changed. For example:
 
 ```js
-const profile = new Model({name: 'Ada'});
-let callbackData;
-
-profile.on('update', state => {
-    callbackData = state;
+const profile = new Model({
+    preferences: {theme: 'light'}
 });
 
-profile.update({name: 'Grace'}); // => true
+let callbackData;
+profile.on('mutate', payload => {
+    callbackData = payload;
+});
+
+profile.get().preferences.theme = 'dark'; // => 'dark'
 
 callbackData;
-// => {name: 'Grace'}
+// => {
+//      operation: 'set',
+//      path: ['preferences', 'theme'],
+//      oldValue: 'light',
+//      newValue: 'dark',
+//      state: {
+//          preferences: {theme: 'dark'}
+//      }
+//    }
 ```
-
-Direct proxy mutation listeners receive the path-specific `mutate` payload described above.
 
 Remove a listener with the same callback reference:
 
