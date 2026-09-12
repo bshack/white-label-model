@@ -211,6 +211,36 @@ Remove a listener with the same callback reference:
 model.removeListener('change', handleAnyChange);
 ```
 
+## Async work
+
+Model state changes and event emission are synchronous. Methods such as `set()`, `update()`, `push()`, and `delete()` complete before returning, so code can immediately read the resulting state and listeners observe the change in the same call stack.
+
+Keep asynchronous work outside the core mutation API and apply its result synchronously when it is ready:
+
+```js
+const data = await fetchData();
+model.set(data);
+
+model.get();
+// => the state produced from data
+```
+
+Application-specific async behavior can also live in a subclass or other wrapper without changing the core Model contract:
+
+```js
+class UserModel extends Model {
+    async load() {
+        const response = await fetch('/user');
+        const data = await response.json();
+
+        this.set(data);
+        return this.get();
+    }
+}
+```
+
+This keeps I/O, retries, cancellation, and transport concerns outside Model while preserving deterministic synchronous state updates.
+
 ## Runtime validation
 
 Pass an optional validator when explicit state changes must satisfy a runtime contract:
