@@ -42,6 +42,14 @@ jobs:
               "            return this.set(candidate, dataOrSilent === true) &&\n                (dataOrSilent === true || this.message(['update'], this.get()));",
               "            if (!this.set(candidate, true)) {\n                return false;\n            }\n            if (dataOrSilent !== true) {\n                this.message(['change', 'update'], this.get());\n            }\n            return true;"
           )
+          text = text.replace(
+              "            const additions = Array.isArray(key) ? key.map(item => this.toRaw(item)) : [this.toRaw(key)];\n            const candidate = raw.concat(additions);",
+              "            const additions: unknown[] = [];\n            if (Array.isArray(key)) {\n                for (let index = 0; index < key.length; index += 1) {\n                    additions.push(this.toRaw(key[index]));\n                }\n            } else {\n                additions.push(this.toRaw(key));\n            }\n            const candidate = raw.concat(additions);"
+          )
+          text = text.replace(
+              "            additions.forEach(item => raw.push(item));",
+              "            for (let index = 0; index < additions.length; index += 1) {\n                raw.push(additions[index]);\n            }"
+          )
           path.write_text(text)
           PY
           rm -f dist/collection.js dist/collection.js.map dist/collection.d.ts
