@@ -1,1196 +1,178 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const {describe, it, beforeEach, afterEach, mock} = require('node:test');
-const {isDeepStrictEqual} = require('node:util');
+const {describe, it, mock} = require('node:test');
+const {Model} = require('../dist/index');
 
-afterEach(() => mock.restoreAll());
+describe('Unified Model', () => {
+    it('accepts plain objects, arrays, and Maps and rejects unsupported roots', () => {
+        assert.deepEqual(new Model({name: 'Ada'}).get(), {name: 'Ada'});
+        assert.deepEqual(new Model(['Ada']).get(), ['Ada']);
+        assert.deepEqual([...new Model(new Map([['name', 'Ada']])).get()], [['name', 'Ada']]);
+        assert.throws(() => new Model('invalid'), TypeError);
+    });
 
-const WhiteLabelModel = require('../dist/index');
+    it('gets complete state and individual members', () => {
+        const symbol = Symbol('value');
+        const object = new Model({name: 'Ada', 2: 'two', [symbol]: 'symbol'});
+        const array = new Model(['zero']);
+        const map = new Model(new Map([[undefined, 'undefined'], ['name', 'Ada']]));
+        assert.equal(object.get('name'), 'Ada');
+        assert.equal(object.get(2), 'two');
+        assert.equal(object.get(symbol), 'symbol');
+        assert.equal(object.get({}), undefined);
+        assert.equal(array.get(0), 'zero');
+        assert.equal(array.get('0'), undefined);
+        assert.equal(map.get(undefined), 'undefined');
+        assert.equal(map.get('name'), 'Ada');
+    });
 
-// canary
-describe("A suite", function() {
-    it("contains spec with an expectation", function() {
-        assert.equal(true, true);
+    it('sets supported state, respects validation, silence, and proxy unwrapping', () => {
+        const change = mock.fn();
+        const set = mock.fn();
+        const model = new Model({name: 'Ada'}, value => !Array.isArray(value) && value.name !== 'invalid');
+        model.on('change', change);
+        model.on('set', set);
+        assert.equal(model.set({name: 'Grace'}), true);
+        assert.equal(change.mock.callCount(), 1);
+        assert.equal(set.mock.callCount(), 1);
+        assert.equal(model.set({name: 'Silent'}, true), true);
+        assert.equal(change.mock.callCount(), 1);
+        assert.equal(model.set({name: 'invalid'}), false);
+        assert.equal(model.set('bad'), false);
+        const child = model.get();
+        assert.equal(model.set(child, true), true);
+        assert.equal(model.get().name, 'Silent');
     });
-});
 
+    it('updates object roots with a shallow merge', () => {
+        const model = new Model({name: 'Ada', meta: {active: true}});
+        const change = mock.fn();
+        model.on('change', change);
+        assert.equal(model.update({name: 'Grace'}), true);
+        assert.deepEqual(model.get(), {name: 'Grace', meta: {active: true}});
+        assert.equal(model.update({meta: {active: false}}, true), true);
+        assert.deepEqual(model.get().meta, {active: false});
+        assert.equal(change.mock.callCount(), 1);
+        assert.equal(model.update('bad'), false);
+        assert.equal(model.update({name: 'Lin'}, 'bad'), false);
+        assert.equal(model.update({name: 'Lin'}, false, true), false);
+    });
 
+    it('rejects object updates that fail validation', () => {
+        const model = new Model({count: 1}, value => value.count < 3);
+        assert.equal(model.update({count: 2}), true);
+        assert.equal(model.update({count: 3}), false);
+        assert.equal(model.get().count, 2);
+    });
 
+    it('updates array members by index and merges plain objects', () => {
+        const model = new Model([{name: 'Ada', active: true}, 'second']);
+        assert.equal(model.update(0, {name: 'Grace'}), true);
+        assert.deepEqual(model.get(0), {name: 'Grace', active: true});
+        assert.equal(model.update(1, 'updated', true), true);
+        assert.equal(model.get(1), 'updated');
+        assert.equal(model.update(9, 'missing'), false);
+        assert.equal(model.update(-1, 'missing'), false);
+        assert.equal(model.update('0', 'missing'), false);
+        assert.equal(model.update(0), false);
+    });
 
+    it('updates Map members and validates candidate collection state', () => {
+        const model = new Model(new Map([['person', {name: 'Ada', active: true}]]), value => value.get('person')?.name !== 'Invalid');
+        assert.equal(model.update('person', {name: 'Grace'}), true);
+        assert.deepEqual(model.get('person'), {name: 'Grace', active: true});
+        assert.equal(model.update('person', {name: 'Invalid'}), false);
+        assert.equal(model.update('missing', {name: 'Nope'}), false);
+        assert.equal(model.get('person').name, 'Grace');
+    });
 
-describe("White Label Model module", function() {
-    const Model = WhiteLabelModel.Model;
-    const Collection = WhiteLabelModel.Collection;
-    it("has a Model function defined", function() {
-        assert.ok(typeof WhiteLabelModel.Model === 'function');
+    it('pushes one or many array values and supports silence and validation', () => {
+        const model = new Model([], value => value.length <= 3);
+        const push = mock.fn();
+        model.on('push', push);
+        assert.equal(model.push('a'), true);
+        assert.equal(model.push(['b', 'c'], true), true);
+        assert.deepEqual(model.get(), ['a', 'b', 'c']);
+        assert.equal(push.mock.callCount(), 1);
+        assert.equal(model.push('d'), false);
+        assert.equal(model.push(undefined), false);
+        assert.equal(model.push('d', 'bad'), false);
+        assert.equal(model.push('d', false, true), false);
     });
-    it("has a Collection function defined", function() {
-        assert.ok(typeof WhiteLabelModel.Collection === 'function');
-    });
-});
 
+    it('pushes Map entries and Maps', () => {
+        const model = new Model(new Map());
+        assert.equal(model.push('ada', {name: 'Ada'}), true);
+        assert.equal(model.push(new Map([['grace', {name: 'Grace'}]])), true);
+        assert.deepEqual(model.get('ada'), {name: 'Ada'});
+        assert.deepEqual(model.get('grace'), {name: 'Grace'});
+        assert.equal(model.push(new Map(), 'bad'), false);
+        assert.equal(model.push('missing-value'), false);
+        const object = new Model({});
+        assert.equal(object.push('nope'), false);
+    });
 
+    it('validates Map pushes before applying them', () => {
+        const model = new Model(new Map(), value => !value.has('blocked'));
+        assert.equal(model.push('ok', 1), true);
+        assert.equal(model.push('blocked', 2), false);
+        assert.equal(model.push(new Map([['blocked', 3]])), false);
+        assert.equal(model.get().has('blocked'), false);
+    });
 
+    it('deletes object properties, array members, and Map entries', () => {
+        const symbol = Symbol('symbol');
+        const object = new Model({name: 'Ada', 2: 'two', [symbol]: true});
+        assert.equal(object.delete('name'), true);
+        assert.equal(object.delete(2), true);
+        assert.equal(object.delete(symbol, true), true);
+        assert.equal(object.delete('missing'), false);
+        assert.equal(object.delete({}), false);
 
+        const array = new Model(['a', 'b']);
+        assert.equal(array.delete(0), true);
+        assert.deepEqual(array.get(), ['b']);
+        assert.equal(array.delete(-1), false);
+        assert.equal(array.delete(9), false);
+        assert.equal(array.delete('0'), false);
 
-describe("A Model", function() {
-    let callback, initCallback;
-    const Model = WhiteLabelModel.Model;
-    let modelColor;
-    let modelColorChange;
-    beforeEach(function() {
-        callback = mock.fn();
-        initCallback = mock.fn();
-        const ModelTest = class extends Model {
-            initialize() {
-                initCallback();
-                return this;
-            }
-            extendedFunction() {
-            }
-        };
-        modelColor = new ModelTest();
+        const map = new Model(new Map([['a', 1]]));
+        assert.equal(map.delete('a'), true);
+        assert.equal(map.delete('a'), false);
     });
-    afterEach(function() {
-        callback = undefined;
-        initCallback = undefined;
-    });
-    it("is an object", function() {
-        assert.ok(modelColor instanceof Object);
-    });
-    it("is has an modelData object", function() {
-        assert.ok(modelColor.modelData instanceof Object);
-    });
-    it("is has an initialize function", function() {
-        assert.ok(typeof modelColor.initialize === 'function');
-    });
-    it("is has a set function", function() {
-        assert.ok(typeof modelColor.set === 'function');
-    });
-    it("is has a get function", function() {
-        assert.ok(typeof modelColor.get === 'function');
-    });
-    it("is has an update function", function() {
-        assert.ok(typeof modelColor.update === 'function');
-    });
-    it("is has an delete function", function() {
-        assert.ok(typeof modelColor.delete === 'function');
-    });
-    it("is has an destroy function", function() {
-        assert.ok(typeof modelColor.destroy === 'function');
-    });
-    it("is does not have a mediator setup", function() {
-        assert.deepEqual(modelColor.mediator, false);
-    });
-    it("is does not have a name defined", function() {
-        assert.deepEqual(modelColor.name, false);
-    });
-    it("calls initialize function", function() {
-        modelColor.initialize();
-        assert.ok(initCallback.mock.callCount() > 0);
-    });
-    it("calls initialize function and returns 'this'", function() {
-        let modelColor = new Model();
-        let result = modelColor.initialize();
-        assert.ok(result instanceof Object);
-    });
-    it("will save data in the model at instantiation", function() {
-        modelColor = new Model({
-            name: 'red'
-        });
-        assert.deepEqual(modelColor.modelData.name, 'red');
-    });
-    it("will save data in the model using set", function() {
-        let setReturns = modelColor.set({
-            name: 'red'
-        });
-        assert.deepEqual(modelColor.modelData.name, 'red');
-        assert.deepEqual(setReturns, true);
-    });
-    it("will save data in the model using set and passing silent argument", function() {
-        let setReturns = modelColor.set({
-            name: 'red'
-        }, true);
-        assert.deepEqual(modelColor.modelData.name, 'red');
-        assert.deepEqual(setReturns, true);
-    });
-    it("will save data in the model using set and emit set event", function() {
-        modelColor.on('set', callback);
-        let setReturns = modelColor.set({
-            name: 'red'
-        });
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Object));
-    });
-    it("will save data in the model using set and will not emit set event when passing the silent argument", function() {
-        modelColor.on('set', callback);
-        let setReturns = modelColor.set({
-            name: 'red'
-        }, true);
-        assert.equal(callback.mock.calls.some(call =>
-            call.arguments.length === 1 && call.arguments[0] instanceof Object), false);
-    });
-    it("will save data in the model using set and emit change event", function() {
-        modelColor.on('change', callback);
-        let setReturns = modelColor.set({
-            name: 'red'
-        });
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Object));
-    });
-    it("will not save data in the model using set when no data is passed in", function() {
-        let setReturns = modelColor.set();
-        assert.deepEqual(modelColor.modelData, {});
-        assert.deepEqual(setReturns, false);
-    });
-    it("will retrieve data in the model using get", function() {
-        modelColor.set({
-            name: 'red'
-        });
-        var redColorData = modelColor.get();
-        assert.deepEqual(redColorData.name, 'red');
-    });
-    it("will update data in the model using update", function() {
-        modelColor.set({
-            name: 'red'
-        });
-        let updateReturns = modelColor.update({
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        let updateReturnsEmpty = modelColor.update();
-        assert.deepEqual(modelColor.get(), {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.deepEqual(updateReturns, true);
-        assert.deepEqual(updateReturnsEmpty, false);
-    });
-    it("will update data in the model using update and passing silent argument", function() {
-        modelColor.set({
-            name: 'red'
-        });
-        let updateReturns = modelColor.update({
-            name: 'blue',
-            isPrimaryColor: true
-        }, true);
-        let updateReturnsEmpty = modelColor.update();
-        assert.deepEqual(modelColor.get(), {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.deepEqual(updateReturns, true);
-        assert.deepEqual(updateReturnsEmpty, false);
-    });
-    it("will update data in the model using update and emit update event", function() {
-        modelColor.on('update', callback);
-        modelColor.set({
-            name: 'red'
-        });
-        let updateReturns = modelColor.update({
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Object));
-    });
-    it("will update data in the model using update and not emit update event when passing slient argument", function() {
-        modelColor.on('update', callback);
-        modelColor.set({
-            name: 'red'
-        });
-        let updateReturns = modelColor.update({
-            name: 'blue',
-            isPrimaryColor: true
-        }, true);
-        assert.equal(callback.mock.calls.some(call =>
-            call.arguments.length === 1 && call.arguments[0] instanceof Object), false);
-    });
-    it("will update data in the model using update and emit change event", function() {
-        modelColor.on('change', callback);
-        modelColor.set({
-            name: 'red'
-        });
-        let updateReturns = modelColor.update({
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Object));
-    });
-    it("will remove the data from the model using delete", function() {
-        modelColor.set({
-            name: 'red'
-        });
-        let deleteReturns = modelColor.delete();
-        assert.deepEqual(modelColor.get(), {});
-        assert.deepEqual(deleteReturns, true);
-    });
-    it("will remove the data from the model using delete when passing silent argument", function() {
-        modelColor.set({
-            name: 'red'
-        });
-        let deleteReturns = modelColor.delete(true);
-        assert.deepEqual(modelColor.get(), {});
-        assert.deepEqual(deleteReturns, true);
-    });
-    it("will remove data in the model using delete and emit delete event", function() {
-        modelColor.on('delete', callback);
-        modelColor.set({
-            name: 'red'
-        });
-        let deleteReturns = modelColor.delete();
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Object));
-    });
-    it("will remove data in the model using delete and emit delete event when passing silent argument", function() {
-        modelColor.on('delete', callback);
-        modelColor.set({
-            name: 'red'
-        });
-        let deleteReturns = modelColor.delete(true);
-        assert.equal(callback.mock.calls.some(call =>
-            call.arguments.length === 1 && call.arguments[0] instanceof Object), false);
-    });
-    it("will remove data in the model using delete and emit change event", function() {
-        modelColor.on('change', callback);
-        modelColor.set({
-            name: 'red'
-        });
-        let deleteReturns = modelColor.delete();
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Object));
-    });
-    it("will return 'this' object when destroy is called", function() {
-        let destroyReturns = modelColor.destroy();
-        assert.ok(destroyReturns instanceof Object);
-    });
-    it("can be extended", function() {
-        assert.ok(typeof modelColor.extendedFunction === 'function');
-    });
-    it("will save data in the model using set and emit set event with mediator", function() {
-        //fake mediator
-        let mediator = new function() {
-            this.emit = function(message, data) {}
-        };
-        mock.method(mediator, 'emit');
-        const MediatorModelTest = class extends Model {
-            constructor() {
-                super();
-                // optionally add in a mediator when extended
-                this.mediator = mediator;
-                // name for this model instance be used in mediator emit. Required on when using a mediator
-                this.name = 'test-mediator-1';
-            }
-        };
-        const mediatorModelTest = new MediatorModelTest();
-        mediatorModelTest.set({
-            name: 'red'
-        });
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            isDeepStrictEqual(call.arguments, ['model:test-mediator-1:set', {
-            name: 'red'
-        }])));
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            isDeepStrictEqual(call.arguments, ['model:test-mediator-1:change', {
-            name: 'red'
-        }])));
-    });
-    it("will update data in the model using update and emit change event with mediator", function() {
-        //fake mediator
-        let mediator = new function() {
-            this.emit = function(message, data) {}
-        };
-        mock.method(mediator, 'emit');
-        const MediatorModelTest = class extends Model {
-            constructor() {
-                super();
-                // optionally add in a mediator when extended
-                this.mediator = mediator;
-                // name for this model instance be used in mediator emit. Required on when using a mediator
-                this.name = 'test-mediator-1';
-            }
-        };
-        const mediatorModelTest = new MediatorModelTest();
-        mediatorModelTest.set({
-            name: 'red'
-        });
-        mediatorModelTest.update({
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            isDeepStrictEqual(call.arguments, ['model:test-mediator-1:update', {
-            name: 'blue',
-            isPrimaryColor: true
-        }])));
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            isDeepStrictEqual(call.arguments, ['model:test-mediator-1:change', {
-            name: 'blue',
-            isPrimaryColor: true
-        }])));
-    });
-    it("will remove data in the model using delete and emit delete event with mediator", function() {
-        //fake mediator
-        let mediator = new function() {
-            this.emit = function(message, data) {}
-        };
-        mock.method(mediator, 'emit');
-        const MediatorModelTest = class extends Model {
-            constructor() {
-                super();
-                // optionally add in a mediator when extended
-                this.mediator = mediator;
-                // name for this model instance be used in mediator emit. Required on when using a mediator
-                this.name = 'test-mediator-1';
-            }
-        };
-        const mediatorModelTest = new MediatorModelTest();
-        mediatorModelTest.set({
-            name: 'red'
-        });
-        mediatorModelTest.delete();
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            isDeepStrictEqual(call.arguments, ['model:test-mediator-1:delete', {}])));
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            isDeepStrictEqual(call.arguments, ['model:test-mediator-1:change', {}])));
-    });
-});
 
+    it('rejects deletes that fail validation', () => {
+        const object = new Model({required: true}, value => value.required === true);
+        assert.equal(object.delete('required'), false);
+        const array = new Model(['required'], value => value.length > 0);
+        assert.equal(array.delete(0), false);
+        const map = new Model(new Map([['required', true]]), value => value.has('required'));
+        assert.equal(map.delete('required'), false);
+    });
 
+    it('clears each root shape while preserving its shape and bypassing acceptance validation for lifecycle cleanup', () => {
+        const object = new Model({required: true}, value => value.required === true);
+        const array = new Model(['a']);
+        const map = new Model(new Map([['a', 1]]));
+        assert.equal(object.clear(), true);
+        assert.deepEqual(object.get(), {});
+        assert.equal(array.clear(true), true);
+        assert.deepEqual(array.get(), []);
+        assert.equal(map.clear(), true);
+        assert.equal(map.get().size, 0);
+    });
 
-
-
-
-describe("A Collection array", function() {
-    let callback, initCallback;
-    const Model = WhiteLabelModel.Model;
-    const Collection = WhiteLabelModel.Collection;
-    let modelColor1;
-    let modelColor2;
-    let modelColor3;
-    let modelColors;
-    beforeEach(function() {
-        callback = mock.fn();
-        initCallback = mock.fn();
-        const CollectionTest = class extends Collection {
-            initialize() {
-                initCallback();
-                return this;
-            }
-            extendedFunction() {
-            }
-        };
-        modelColor1 = new Model({
-            name: 'red'
-        });
-        modelColor2 = new Model({
-            name: 'green'
-        });
-        modelColor3 = new Model({
-            name: 'blue'
-        });
-        modelColors = new CollectionTest();
-    });
-    afterEach(function() {
-        callback = undefined;
-        initCallback = undefined;
-    });
-    it("is an object", function() {
-        assert.ok(modelColors instanceof Object);
-    });
-    it("is has an collectionData Array", function() {
-        assert.ok(Array.isArray(modelColors.collectionData));
-    });
-    it("is has an initialize function", function() {
-        assert.ok(typeof modelColors.initialize === 'function');
-    });
-    it("is has a set function", function() {
-        assert.ok(typeof modelColors.set === 'function');
-    });
-    it("is has a push function", function() {
-        assert.ok(typeof modelColors.push === 'function');
-    });
-    it("is has a get function", function() {
-        assert.ok(typeof modelColors.get === 'function');
-    });
-    it("is has an update function", function() {
-        assert.ok(typeof modelColors.update === 'function');
-    });
-    it("is has an delete function", function() {
-        assert.ok(typeof modelColors.delete === 'function');
-    });
-    it("is has an destroy function", function() {
-        assert.ok(typeof modelColors.destroy === 'function');
-    });
-    it("is does not have a mediator setup", function() {
-        assert.deepEqual(modelColors.mediator, false);
-    });
-    it("is does not have a name defined", function() {
-        assert.deepEqual(modelColors.name, false);
-    });
-    it("calls initialize function", function() {
-        modelColors.initialize();
-        assert.ok(initCallback.mock.callCount() > 0);
-    });
-    it("calls initialize function and returns 'this'", function() {
-        let modelColors = new Collection();
-        let result = modelColors.initialize();
-        assert.ok(result instanceof Object);
-    });
-    it("will save data in the collection at instantiation", function() {
-        modelColors = new Collection([
-            modelColor1,
-            modelColor2,
-            modelColor3
-        ]);
-        assert.deepEqual(modelColors.collectionData[0].modelData, {
-            name: 'red'
-        });
-    });
-    it("will save data in the collection using set", function() {
-        let setReturns = modelColors.set([
-            modelColor1,
-            modelColor2,
-            modelColor3
-        ]);
-        assert.deepEqual(modelColors.collectionData[0].modelData, {
-            name: 'red'
-        });
-        assert.deepEqual(setReturns, true);
-    });
-    it("will save data in the collection using set with the silent argument defined", function() {
-        let setReturns = modelColors.set([
-            modelColor1,
-            modelColor2,
-            modelColor3
-        ], true);
-        assert.deepEqual(modelColors.collectionData[0].modelData, {
-            name: 'red'
-        });
-        assert.deepEqual(setReturns, true);
-    });
-    it("will not save data in the collection using set when the data is not an array or map", function() {
-        let setReturns = modelColors.set('someString');
-        assert.deepEqual(modelColors.collectionData, []);
-        assert.deepEqual(setReturns, false);
-        setReturns = modelColors.set(3);
-        assert.deepEqual(modelColors.collectionData, []);
-        assert.deepEqual(setReturns, false);
-    });
-    it("will save data in the collection using set and emit set event", function() {
-        callback = mock.fn();
-        modelColors.on('set', callback);
-        let setReturns = modelColors.set([
-            modelColor1,
-            modelColor2,
-            modelColor3
-        ]);
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
-    });
-    it("will save data in the collection using set and not emit set event with the silent argument", function() {
-        callback = mock.fn();
-        modelColors.on('set', callback);
-        let setReturns = modelColors.set([
-            modelColor1,
-            modelColor2,
-            modelColor3
-        ], true);
-        assert.equal(callback.mock.callCount(), 0);
-    });
-    it("will save data in the collection using set and emit change event", function() {
-        callback = mock.fn();
-        modelColors.on('change', callback);
-        let setReturns = modelColors.set([
-            modelColor1,
-            modelColor2,
-            modelColor3
-        ]);
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
-    });
-    it("will save data to the end of the collection using push with an array", function() {
-        modelColors.push(modelColor1);
-        let pushReturns = modelColors.push([
-            modelColor2,
-            modelColor3
-        ]);
-        assert.deepEqual(modelColors.collectionData[2].modelData, {
-            name: 'blue'
-        });
-        assert.deepEqual(pushReturns, true);
-    });
-    it("will save data to the end of the collection using push with an array with silent argument", function() {
-        modelColors.push(modelColor1);
-        let pushReturns = modelColors.push([
-            modelColor2,
-            modelColor3
-        ], true);
-        assert.deepEqual(modelColors.collectionData[2].modelData, {
-            name: 'blue'
-        });
-        assert.deepEqual(pushReturns, true);
-    });
-    it("will save data to the end of the collection using push with a single item", function() {
-        let pushReturns = modelColors.push(modelColor1);
-        assert.deepEqual(modelColors.collectionData[0].modelData, {
-            name: 'red'
-        });
-        assert.deepEqual(pushReturns, true);
-    });
-    it("will not save data in the collection using push when data is not passed in", function() {
-        let pushReturns = modelColors.push();
-        assert.deepEqual(modelColors.collectionData, []);
-        assert.deepEqual(pushReturns, false);
-    });
-    it("will save data in the collection using push and emit push event", function() {
-        callback = mock.fn();
-        modelColors.on('push', callback);
-        modelColors.push(modelColor1);
-        let pushReturns = modelColors.push([
-            modelColor2,
-            modelColor3
-        ]);
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
-    });
-    it("will save data in the collection using push and will not emit push event with silent argument passed in", function() {
-        callback = mock.fn();
-        modelColors.on('push', callback);
-        modelColors.push(modelColor1, true);
-        let pushReturns = modelColors.push([
-            modelColor2,
-            modelColor3
-        ], true);
-        assert.equal(callback.mock.callCount(), 0);
-    });
-    it("will save data in the collection using push and emit change event", function() {
-        callback = mock.fn();
-        modelColors.on('change', callback);
-        modelColors.push(modelColor1);
-        let pushReturns = modelColors.push([
-            modelColor2,
-            modelColor3
-        ]);
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
-    });
-    it("will retrieve all the data in the collection using get", function() {
-        modelColors.push(modelColor1);
-        var allColorData = modelColors.get();
-        assert.ok(Array.isArray(allColorData));
-        assert.deepEqual(allColorData.length, 1);
-        assert.deepEqual(allColorData[0].modelData, {
-            name: 'red'
-        });
-    });
-    it("will retrieve one model in the collection using get at the specified index", function() {
-        modelColors.push(modelColor1);
-        var colorData = modelColors.get(0);
-        assert.ok(colorData instanceof Object);
-        assert.deepEqual(colorData.modelData, {
-            name: 'red'
-        });
-    });
-    it("will update model data in the collection using update at the specified index", function() {
-        modelColors.push(modelColor1);
-        let updateReturns = modelColors.update(0, {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.deepEqual(modelColors.get(0).modelData, {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.deepEqual(updateReturns, true);
-    });
-    it("will update model data in the collection using update at the specified index with the silent argument passed in", function() {
-        modelColors.push(modelColor1);
-        let updateReturns = modelColors.update(0, {
-            name: 'blue',
-            isPrimaryColor: true
-        }, true);
-        assert.deepEqual(modelColors.get(0).modelData, {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.deepEqual(updateReturns, true);
-    });
-    it("will update object data in the collection using update at the specified index", function() {
-        modelColors.push({
-            foo: 'bar'
-        });
-        let updateReturns = modelColors.update(0, {
-            foo: 'fighters',
-            isBand: true
-        });
-        assert.deepEqual(modelColors.get(0), {
-            foo: 'fighters',
-            isBand: true
-        });
-        assert.deepEqual(updateReturns, true);
-    });
-    it("will update non object data in the collection using update at the specified index", function() {
-        modelColors.push(123);
-        let updateReturns = modelColors.update(0, 456);
-        assert.deepEqual(modelColors.get(0), 456);
-        assert.deepEqual(updateReturns, true);
-    });
-    it("will not update all model data in the collection when the argument is not an array at the specified index",
-        function() {
-        modelColors.push(modelColor1);
-        let updateReturns = modelColors.update(0);
-        assert.deepEqual(modelColors.get(0).modelData, {
-            name: 'red'
-        });
-        assert.deepEqual(updateReturns, false);
-    });
-    it("will update model data in the collection using update with an array of models", function() {
-        modelColors.push(modelColor1);
-        let updateReturns = modelColors.set([
-            new Model({
-                name: 'cyan'
-            }),
-            new Model({
-                name: 'magenta'
-            }),
-            new Model({
-                name: 'yellow'
-            }),
-            new Model({
-                name: 'black'
-            })
-        ]);
-        assert.deepEqual(modelColors.get(0).modelData, {
-            name: 'cyan'
-        });
-        assert.deepEqual(modelColors.get(3).modelData, {
-            name: 'black'
-        });
-        assert.deepEqual(updateReturns, true);
-    });
-    it("will not update all model data in the collection when the argument is not an array", function() {
-        modelColors.set([
-            new Model({
-                name: 'cyan'
-            }),
-            new Model({
-                name: 'magenta'
-            }),
-            new Model({
-                name: 'yellow'
-            }),
-            new Model({
-                name: 'black'
-            })
-        ]);
-        let updateReturns = modelColors.update({});
-        assert.deepEqual(modelColors.get(3).modelData, {
-            name: 'black'
-        });
-        assert.deepEqual(updateReturns, false);
-    });
-    it("will update data in the collection using update and emit update event", function() {
-        callback = mock.fn();
-        modelColors.on('update', callback);
-        modelColors.push(modelColor1);
-        let updateReturns = modelColors.update(0, {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
-    });
-    it("will update data in the collection using update and not emit update event with silent argument passed in", function() {
-        callback = mock.fn();
-        modelColors.on('update', callback);
-        modelColors.push(modelColor1);
-        let updateReturns = modelColors.update(0, {
-            name: 'blue',
-            isPrimaryColor: true
-        }, true);
-        assert.equal(callback.mock.callCount(), 0);
-    });
-    it("will update data in the collection using update and emit change event", function() {
-        callback = mock.fn();
-        modelColors.on('change', callback);
-        modelColors.push(modelColor1);
-        let updateReturns = modelColors.update(0, {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
-    });
-    it("will remove model data from the the collection using delete at the specified index", function() {
-        modelColors.set([
-            new Model({
-                name: 'cyan'
-            }),
-            new Model({
-                name: 'magenta'
-            }),
-            new Model({
-                name: 'yellow'
-            }),
-            new Model({
-                name: 'black'
-            })
-        ]);
-        let deleteReturns = modelColors.delete(2);
-        assert.deepEqual(modelColors.get(2).modelData, {
-            name: 'black'
-        });
-        assert.deepEqual(modelColors.get().length, 3);
-        assert.deepEqual(deleteReturns, true);
-    });
-    it("will not remove model data from the the collection using delete at the specified index when that index does not exist", function() {
-        modelColors.set([
-            new Model({
-                name: 'cyan'
-            }),
-            new Model({
-                name: 'magenta'
-            }),
-            new Model({
-                name: 'yellow'
-            }),
-            new Model({
-                name: 'black'
-            })
-        ]);
-        let deleteReturns = modelColors.delete(10);
-        assert.deepEqual(modelColors.get(2).modelData, {
-            name: 'yellow'
-        });
-        assert.deepEqual(modelColors.get().length, 4);
-        assert.deepEqual(deleteReturns, false);
-    });
-    it("will remove all the model data from the collection using delete", function() {
-        modelColors.push({
-            name: 'red'
-        });
-        let deleteReturns = modelColors.clear();
-        assert.ok(Array.isArray(modelColors.get()));
-        assert.deepEqual(modelColors.get().length, 0);
-        assert.deepEqual(deleteReturns, true);
-    });
-    it("will remove all the model data from the collection using delete and passing in silent argument", function() {
-        modelColors.push({
-            name: 'red'
-        });
-        let deleteReturns = modelColors.clear(true);
-        assert.ok(Array.isArray(modelColors.get()));
-        assert.deepEqual(modelColors.get().length, 0);
-        assert.deepEqual(deleteReturns, true);
-    });
-    it("will remove data in the collection using delete and emit delete event", function() {
-        callback = mock.fn();
-        modelColors.on('delete', callback);
-        let deleteReturns = modelColors.push({
-            name: 'red'
-        });
-        modelColors.clear();
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
-    });
-    it("will remove data in the collection using delete and not emit delete event when passing silent argument", function() {
-        callback = mock.fn();
-        modelColors.on('delete', callback);
-        let deleteReturns = modelColors.push({
-            name: 'red'
-        });
-        modelColors.clear(true);
-        assert.equal(callback.mock.callCount(), 0);
-    });
-    it("will remove data in the collection using delete and emit change event", function() {
-        callback = mock.fn();
-        modelColors.on('change', callback);
-        let deleteReturns = modelColors.push({
-            name: 'red'
-        });
-        modelColors.clear();
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && Array.isArray(call.arguments[0])));
-    });
-    it("will add data to the model using push and emit push event with the mediator", function() {
-        //fake mediator
-        let mediator = new function() {
-            this.emit = function(message, data) {}
-        };
-        mock.method(mediator, 'emit');
-        const MediatorCollectionTest = class extends Collection {
-            constructor() {
-                super();
-                // optionally add in a mediator when extended
-                this.mediator = mediator;
-                // name for this model instance be used in mediator emit. Required on when using a mediator
-                this.name = 'test-mediator-1';
-            }
-        };
-        const mediatorCollectionTest = new MediatorCollectionTest();
-        mediatorCollectionTest.push(modelColor1);
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:push' && Array.isArray(call.arguments[1])));
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:change' && Array.isArray(call.arguments[1])));
-    });
-    it("will set data in the model using set and emit set event with the mediator", function() {
-        //fake mediator
-        let mediator = new function() {
-            this.emit = function(message, data) {}
-        };
-        mock.method(mediator, 'emit');
-        const MediatorCollectionTest = class extends Collection {
-            constructor() {
-                super();
-                // optionally add in a mediator when extended
-                this.mediator = mediator;
-                // name for this model instance be used in mediator emit. Required on when using a mediator
-                this.name = 'test-mediator-1';
-            }
-        };
-        const mediatorCollectionTest = new MediatorCollectionTest();
-        mediatorCollectionTest.set([modelColor1]);
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:set' && Array.isArray(call.arguments[1])));
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:change' && Array.isArray(call.arguments[1])));
-    });
-    it("will update data in the model using update and emit delete event with the mediator", function() {
-        //fake mediator
-        let mediator = new function() {
-            this.emit = function(message, data) {}
-        };
-        mock.method(mediator, 'emit');
-        const MediatorCollectionTest = class extends Collection {
-            constructor() {
-                super();
-                // optionally add in a mediator when extended
-                this.mediator = mediator;
-                // name for this model instance be used in mediator emit. Required on when using a mediator
-                this.name = 'test-mediator-1';
-            }
-        };
-        const mediatorCollectionTest = new MediatorCollectionTest();
-        mediatorCollectionTest.push(modelColor1);
-        mediatorCollectionTest.update(0, {
-            color: 'brown'
-        });
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:update' && Array.isArray(call.arguments[1])));
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:change' && Array.isArray(call.arguments[1])));
-    });
-    it("will remove data in the model using delete and emit delete event with the mediator", function() {
-        //fake mediator
-        let mediator = new function() {
-            this.emit = function(message, data) {}
-        };
-        mock.method(mediator, 'emit');
-        const MediatorCollectionTest = class extends Collection {
-            constructor() {
-                super();
-                // optionally add in a mediator when extended
-                this.mediator = mediator;
-                // name for this model instance be used in mediator emit. Required on when using a mediator
-                this.name = 'test-mediator-1';
-            }
-        };
-        const mediatorCollectionTest = new MediatorCollectionTest();
-        mediatorCollectionTest.push(modelColor1);
-        mediatorCollectionTest.clear();
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:delete' && Array.isArray(call.arguments[1])));
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:change' && Array.isArray(call.arguments[1])));
-    });
-    it("will remove data in the model using delete and not emit delete event with the mediator", function() {
-        //fake mediator
-        let mediator = new function() {
-            this.emit = function(message, data) {}
-        };
-        mock.method(mediator, 'emit');
-        const MediatorCollectionTest = class extends Collection {
-            constructor() {
-                super();
-                // optionally add in a mediator when extended
-                this.mediator = mediator;
-                // name for this model instance be used in mediator emit. Required on when using a mediator
-                this.name = 'test-mediator-1';
-            }
-        };
-        const mediatorCollectionTest = new MediatorCollectionTest();
-        mediatorCollectionTest.push(modelColor1);
-        mediatorCollectionTest.clear();
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:delete' && Array.isArray(call.arguments[1])));
-        assert.ok(mediator.emit.mock.calls.some(call =>
-            call.arguments.length === 2 && call.arguments[0] === 'collection:test-mediator-1:change' && Array.isArray(call.arguments[1])));
-    });
-    it("will return 'this' object when destroy is called", function() {
-        let destroyReturns = modelColors.destroy();
-        assert.ok(destroyReturns instanceof Object);
-    });
-    it("can be extended", function() {
-        assert.ok(typeof modelColors.extendedFunction === 'function');
-    });
-});
-
-
-
-
-
-
-describe("A Collection map", function() {
-    let callback, initCallback;
-    const Model = WhiteLabelModel.Model;
-    const Collection = WhiteLabelModel.Collection;
-    let modelColor1;
-    let modelColor2;
-    let modelColor3;
-    let modelColors;
-    beforeEach(function() {
-        callback = mock.fn();
-        const CollectionTest = class extends Collection {};
-        modelColor1 = new Model({
-            name: 'red'
-        });
-        modelColor2 = new Model({
-            name: 'green'
-        });
-        modelColor3 = new Model({
-            name: 'blue'
-        });
-        modelColors = new Collection(new Map());
-    });
-    afterEach(function() {
-        callback = undefined;
-    });
-    it("will save data in the collection at instantiation", function() {
-        let map = new Map([
-            ['color1', modelColor1],
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]);
-        modelColors = new Collection(map);
-        assert.deepEqual(modelColors.collectionData.get('color1').modelData, {
-            name: 'red'
-        });
-    });
-    it("will save data in the collection using set", function() {
-        let map = new Map([
-            ['color1', modelColor1],
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]);
-        let setReturns = modelColors.set(map);
-        assert.deepEqual(modelColors.collectionData.get('color1').modelData, {
-            name: 'red'
-        });
-        assert.deepEqual(setReturns, true);
-    });
-    it("will save data in the collection using set and emit set event", function() {
-        callback = mock.fn();
-        modelColors.on('set', callback);
-        let map = new Map([
-            ['color1', modelColor1],
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]);
-        let setReturns = modelColors.set(map);
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Map));
-    });
-    it("will save data in the collection using set and emit change event", function() {
-        callback = mock.fn();
-        modelColors.on('change', callback);
-        let map = new Map([
-            ['color1', modelColor1],
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]);
-        let setReturns = modelColors.set(map);
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Map));
-    });
-    it("will save data to the end of the collection using push with a map", function() {
-        let map1 = new Map([
-            ['color1', modelColor1]
-        ]);
-        let map2 = new Map([
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]);
-        modelColors.push(map1);
-        let pushReturns = modelColors.push(map2);
-        assert.deepEqual(modelColors.collectionData.get('color1').modelData, {
-            name: 'red'
-        });
-        assert.deepEqual(pushReturns, true);
-    });
-    it("will save data to the end of the collection using push with a single item", function() {
-        let pushReturns = modelColors.push('color1', modelColor1);
-        assert.deepEqual(modelColors.collectionData.get('color1').modelData, {
-            name: 'red'
-        });
-        assert.deepEqual(pushReturns, true);
-    });
-    it("will save data in the collection using push and emit push event", function() {
-        callback = mock.fn();
-        modelColors = new Collection(new Map());
-        modelColors.on('push', callback);
-        modelColors.push('color1', modelColor1);
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Map));
-    });
-    it("will save data in the collection using push and emit change event", function() {
-        callback = mock.fn();
-        modelColors = new Collection(new Map());
-        modelColors.on('change', callback);
-        modelColors.push('color1', modelColor1);
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Map));
-    });
-    it("will retrieve all the data in the collection using get", function() {
-        modelColors.push('color1', modelColor1);
-        var allColorData = modelColors.get();
-        assert.ok(allColorData instanceof Map);
-        assert.deepEqual(allColorData.size, 1);
-        assert.deepEqual(allColorData.get('color1').modelData, {
-            name: 'red'
-        });
-    });
-    it("will retrieve one model in the collection using get at the specified index", function() {
-        modelColors.push('color1', modelColor1);
-        var colorData = modelColors.get('color1');
-        assert.ok(colorData instanceof Object);
-        assert.deepEqual(colorData.modelData, {
-            name: 'red'
-        });
-    });
-    it("will update model data in the collection using update at the specified index", function() {
-        modelColors.push('color1', new Model({
-            name: 'red',
-            isCMYK: false
-        }));
-        let updateReturns = modelColors.update('color1', {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.deepEqual(modelColors.get('color1').modelData, {
-            name: 'blue',
-            isPrimaryColor: true,
-            isCMYK: false
-        });
-        assert.deepEqual(updateReturns, true);
-    });
-    it("will update object data in the collection using update at the specified index", function() {
-        modelColors.push('color1', {
-            name: 'red',
-            isCMYK: false
-        });
-        let updateReturns = modelColors.update('color1', {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.deepEqual(modelColors.get('color1'), {
-            name: 'blue',
-            isPrimaryColor: true,
-            isCMYK: false
-        });
-        assert.deepEqual(updateReturns, true);
-    });
-    it("will update non object data in the collection using update at the specified index", function() {
-        modelColors.push('color1', 'red');
-        modelColors.push('color2', 'green');
-        let updateReturns = modelColors.update('color1', 'blue');
-        assert.deepEqual(modelColors.get('color1'), 'blue');
-        assert.deepEqual(modelColors.get('color2'), 'green');
-        assert.deepEqual(updateReturns, true);
-    });
-    it("will not update all model data in the collection when the update data argument is empty with a specified index",
-        function() {
-        modelColors.push('color1', modelColor1);
-        let updateReturns = modelColors.update('color1');
-        assert.deepEqual(modelColors.get('color1').modelData, {
-            name: 'red'
-        });
-        assert.deepEqual(updateReturns, false);
-    });
-    it("will update model data in the collection using update with a map of models", function() {
-        modelColors = new Collection(new Map([
-            ['color1', modelColor1],
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]));
-        let updateReturns = modelColors.set(new Map([
-            ['color1', modelColor3],
-            ['color2', modelColor2],
-            ['color3', modelColor1]
-        ]));
-        assert.deepEqual(modelColors.get('color3').modelData, {
-            name: 'red'
-        });
-        assert.deepEqual(updateReturns, true);
-    });
-    it("will update data in the collection using update and emit update event", function() {
-        callback = mock.fn();
-        modelColors.on('update', callback);
-        modelColors.push('color1', modelColor1);
-        let updateReturns = modelColors.update('color1', {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Map));
-    });
-    it("will update data in the collection using update and emit change event", function() {
-        callback = mock.fn();
-        modelColors.on('change', callback);
-        modelColors.push('color1', modelColor1);
-        let updateReturns = modelColors.update('color1', {
-            name: 'blue',
-            isPrimaryColor: true
-        });
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Map));
-    });
-    it("will remove model data from the the collection using delete at the specified index", function() {
-        modelColors.set(new Map([
-            ['color1', modelColor1],
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]));
-        let deleteReturns = modelColors.delete('color2');
-        assert.deepEqual(modelColors.get('color2'), undefined);
-        assert.deepEqual(modelColors.get().size, 2);
-        assert.deepEqual(deleteReturns, true);
-    });
-    it("will not remove model data from the the collection using delete at the specified index when that index does not exist", function() {
-        modelColors.set(new Map([
-            ['color1', modelColor1],
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]));
-        let deleteReturns = modelColors.delete('color4');
-        assert.deepEqual(modelColors.get('color4'), undefined);
-        assert.deepEqual(modelColors.get().size, 3);
-        assert.deepEqual(deleteReturns, false);
-    });
-    it("will remove all the model data from the collection using delete", function() {
-        modelColors.set(new Map([
-            ['color1', modelColor1],
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]));
-        let deleteReturns = modelColors.clear();
-        assert.ok(modelColors.get() instanceof Map);
-        assert.deepEqual(modelColors.get().size, 0);
-        assert.deepEqual(deleteReturns, true);
-    });
-    it("will remove data in the collection using delete and emit delete event", function() {
-        callback = mock.fn();
-        modelColors.on('delete', callback);
-        modelColors.set(new Map([
-            ['color1', modelColor1],
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]));
-        modelColors.clear();
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Map));
-    });
-    it("will remove data in the collection using delete and emit change event", function() {
-        callback = mock.fn();
-        modelColors.on('change', callback);
-        modelColors.set(new Map([
-            ['color1', modelColor1],
-            ['color2', modelColor2],
-            ['color3', modelColor3]
-        ]));
-        modelColors.clear();
-        assert.ok(callback.mock.calls.some(call => call.arguments.length === 1 && call.arguments[0] instanceof Map));
+    it('initializes, destroys, and provides empty service hooks', async () => {
+        const model = new Model({name: 'Ada'});
+        model.on('change', () => {});
+        assert.equal(model.initialize(), model);
+        assert.deepEqual(await model.serviceGet(), {});
+        assert.deepEqual(await model.servicePatch(), {});
+        assert.deepEqual(await model.servicePost(), {});
+        assert.deepEqual(await model.servicePut(), {});
+        assert.equal(model.destroy(), model);
+        assert.deepEqual(model.get(), {});
+        assert.deepEqual(model.eventNames(), []);
     });
 });
