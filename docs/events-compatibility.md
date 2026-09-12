@@ -68,7 +68,7 @@ Load the bundle as a script in a browser and check `globalThis.whiteLabelSmokePa
 
 ### Validation of the retained implementation
 
-On September 10, 2026, Node 24.19.0 passed all 186 package tests, consumer type tests, typechecking, and the 100% per-file coverage gate. Rebuilding produced identical dist output. Package dry runs contained no adapter artifacts. esbuild 0.25.10 bundle manifests included npm events and excluded EventEmitter3; both package smoke tests passed in the Codex in-app browser. Clean locked installations reported zero known vulnerabilities. No dedicated lint or formatter is configured; whitespace checks passed. No full downstream application or browser-version matrix was run.
+On September 10, 2026, Node 24.19.0 passed all 186 package tests, consumer type tests, typechecking, and the 100% per-file coverage gate. Rebuilding produced identical dist output. Package dry runs contained no adapter artifacts. esbuild 0.25.10 bundle manifests included npm events and excluded EventEmitter3; both package smoke tests passed in the Codex in-app browser. Clean locked installations reported zero known vulnerabilities. At that date, no dedicated lint or formatter was configured; ESLint was added on September 11, 2026. Whitespace checks passed. No full downstream application or browser-version matrix was run.
 
 Sources:
 
