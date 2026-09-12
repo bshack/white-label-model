@@ -78,6 +78,14 @@ describe('Unified Model', () => {
         assert.equal(model.update(0), false);
     });
 
+    it('validates successful array member updates against candidate state', () => {
+        const model = new Model([1, 2], value => value.every(item => item < 10));
+        assert.equal(model.update(1, 3), true);
+        assert.deepEqual(model.get(), [1, 3]);
+        assert.equal(model.update(1, 10), false);
+        assert.deepEqual(model.get(), [1, 3]);
+    });
+
     it('updates Map members and validates candidate collection state', () => {
         const model = new Model(new Map([['person', {name: 'Ada', active: true}]]), value => value.get('person')?.name !== 'Invalid');
         assert.equal(model.update('person', {name: 'Grace'}), true);
