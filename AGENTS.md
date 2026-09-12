@@ -37,7 +37,7 @@ Edit TypeScript sources and regenerate tracked `dist/` output with the existing 
 
 ## Architectural boundaries
 
-Preserve mutation return values, silent-event semantics, full-state event payloads, and array/Map behavior. Keep runtime validation separate from TypeScript types. Service hooks do not perform HTTP requests unless an application overrides them.
+Preserve mutation return values, silent-event semantics, full-state event payloads, and array/Map behavior. Model state is deeply observable through lazy proxies: keep nested change tracking path-based and do not introduce whole-model deep scans or diffs. Keep runtime validation separate from TypeScript types. Service hooks do not perform HTTP requests unless an application overrides them.
 
 ---
 

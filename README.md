@@ -18,6 +18,10 @@ The package has no DOM or generated HTML, so WCAG and search indexing are applic
 
 Backward compatibility is not maintained through placeholder arguments, sentinel values, deprecated overloads, or permissive legacy return contracts. Breaking public API changes are communicated with a Semantic Versioning major release and migration notes.
 
+### Version 5 migration
+
+`Model.get()` now returns a lazily observed `Proxy`. Direct assignments and property deletions at any nesting depth emit the existing full-state `change` event plus a new `mutate` event with `{operation, path, oldValue, newValue, state}`. Nested objects and arrays are wrapped only when accessed; mutations do not deep-scan or deep-diff unrelated model state. Because `get()` now returns an observable proxy rather than the original root object identity, this is a major release. `Collection` behavior is unchanged.
+
 ### Version 4 migration
 
 Array `push` now uses `push(valueOrValues, silent?)`; bulk Map `push` uses `push(map, silent?)`. The legacy `false` placeholder forms are rejected. Whole-collection replacement uses `set()` rather than the former `update(collection, placeholder, silent)` overload. Clearing uses `clear(silent?)`; `delete()` now always removes one member, so `false` is a valid Map key. Model-like nested setters must return `true` to accept updates. No compatibility shims are retained.
@@ -58,7 +62,7 @@ console.log(profile.get()); // {id: 42, name: 'Grace'}
 
 | Method | Behavior | Events |
 | --- | --- | --- |
-| `get()` | Returns the stored object. | None |
+| `get()` | Returns a lazily observed proxy for the stored object. | Direct nested writes emit `change`, `mutate` |
 | `set(data, silent)` | Replaces all model data with a plain object. | `change`, `set` |
 | `update(data, silent)` | Creates a shallow merge of current and new safe own properties. | `change`, `update` |
 | `delete(silent)` | Replaces the data with an empty object. | `change`, `delete` |
@@ -74,6 +78,19 @@ profile.delete(true);
 ```
 
 `update()` blocks the special keys `__proto__`, `constructor`, and `prototype` while merging. The merge is shallow; nested objects are replaced rather than recursively merged.
+
+Direct writes through `get()` are observed at arbitrary practical depth without recursively scanning the model. Plain objects and arrays are proxied lazily as each branch is accessed. Every changed property emits one `change` event with the complete current state and one `mutate` event with the exact property path. Assigning the same value is ignored. Array methods are observed through the property operations they perform. Direct writes to `__proto__`, `constructor`, and `prototype` are rejected.
+
+```js
+profile.get().preferences = {theme: 'light'};
+profile.get().preferences.theme = 'dark';
+
+profile.on('mutate', ({operation, path, oldValue, newValue}) => {
+    console.log(operation, path, oldValue, newValue);
+});
+```
+
+The observation cost follows the accessed path rather than total model size. CI includes a large-unrelated-state regression test so a nested write cannot silently turn into a whole-model scan.
 
 ## Collection quick start
 
@@ -135,7 +152,7 @@ tasks.set([], true);
 tasks.push({id: 4, complete: false}, true);
 ```
 
-The object returned by `get()` is the stored object, array, or `Map`, not a defensive copy. Treat it as read-only and use mutation methods when you want events to be emitted.
+`Model.get()` returns a live observable proxy, so direct assignments and deletes emit events. `Collection.get()` still returns the stored array or `Map` rather than a defensive copy; use Collection mutation methods when you want collection events.
 
 ## Events
 
@@ -151,6 +168,14 @@ colors.on('push', handleAddition);
 ```
 
 All listeners receive the complete current model or collection data.
+
+For direct Model property changes, `change` keeps that full-state payload and `mutate` receives path-specific details:
+
+```js
+profile.on('mutate', ({operation, path, oldValue, newValue, state}) => {
+    // path is an array of property keys, for example ['user', 'profile', 'name'].
+});
+```
 
 Remove a listener with the same callback reference:
 
@@ -269,6 +294,8 @@ const user = new Model({name: 'Ada'}, value =>
 ```
 
 The validator runs for construction, `set()`, and merged `update()` data. Invalid mutations return `false` and leave existing state unchanged.
+
+Direct assignments through the observable object returned by `get()` do not invoke the optional validator; use `set()` or `update()` when a mutation must pass whole-model runtime validation.
 
 ## Current behavior notes
 

@@ -1,13 +1,11 @@
 "use strict";
 /** @module src/model */
 const Utilities = require("./utilities");
-/*
-MODEL
-*/
 /** Mutable plain-object state with synchronous change notifications. */
 class Model extends Utilities {
     modelData = {};
     validator;
+    proxyTargets = new WeakMap();
     /**
      * Create an instance with its own state and listener references.
      * @param modelData - Initial plain-object fields.
@@ -46,6 +44,86 @@ class Model extends Utilities {
         this.removeAllListeners();
         return this;
     }
+    /** Return the raw object behind one of this model's observable proxies. */
+    toRaw(value) {
+        if (value && typeof value === 'object') {
+            return this.proxyTargets.get(value) || value;
+        }
+        return value;
+    }
+    /** Return whether a nested value should participate in deep change tracking. */
+    isObservable(value) {
+        return Array.isArray(value) || this.isPlainObject(value);
+    }
+    /** Prevent direct proxy writes from bypassing the same dangerous keys blocked by update(). */
+    isBlockedKey(property) {
+        return typeof property === 'string' &&
+            (property === '__proto__' || property === 'constructor' || property === 'prototype');
+    }
+    /** Emit the existing full-state change event plus a path-specific mutation event. */
+    notifyMutation(operation, path, oldValue, newValue) {
+        const state = this.get();
+        const mutation = Object.freeze({
+            operation,
+            path: Object.freeze(path.slice()),
+            oldValue,
+            newValue,
+            state
+        });
+        this.message(['change'], state);
+        this.message(['mutate'], mutation);
+    }
+    /**
+     * Wrap one object lazily so reads only proxy the branch being accessed.
+     * No full-tree traversal or deep comparison occurs when state changes.
+     */
+    observe(value, path) {
+        const childCache = new Map();
+        const proxy = new Proxy(value, {
+            get: (target, property, receiver) => {
+                const result = Reflect.get(target, property, receiver);
+                const rawResult = this.toRaw(result);
+                if (!this.isObservable(rawResult)) {
+                    return result;
+                }
+                const cached = childCache.get(property);
+                if (cached && cached.raw === rawResult) {
+                    return cached.proxy;
+                }
+                const childProxy = this.observe(rawResult, path.concat(property));
+                childCache.set(property, { raw: rawResult, proxy: childProxy });
+                return childProxy;
+            },
+            set: (target, property, nextValue) => {
+                if (this.isBlockedKey(property)) {
+                    return false;
+                }
+                const rawNextValue = this.toRaw(nextValue);
+                const oldValue = this.toRaw(Reflect.get(target, property, target));
+                if (Object.is(oldValue, rawNextValue)) {
+                    return true;
+                }
+                const applied = Reflect.set(target, property, rawNextValue, target);
+                if (applied) {
+                    this.notifyMutation('set', path.concat(property), oldValue, rawNextValue);
+                }
+                return applied;
+            },
+            deleteProperty: (target, property) => {
+                if (!Object.prototype.hasOwnProperty.call(target, property)) {
+                    return true;
+                }
+                const oldValue = this.toRaw(Reflect.get(target, property, target));
+                const removed = Reflect.deleteProperty(target, property);
+                if (removed) {
+                    this.notifyMutation('delete', path.concat(property), oldValue, undefined);
+                }
+                return removed;
+            }
+        });
+        this.proxyTargets.set(proxy, value);
+        return proxy;
+    }
     // the setter
     /**
      * Replace stored data when it has a supported shape; optionally suppress change notifications.
@@ -54,8 +132,9 @@ class Model extends Utilities {
      * @returns True when data was accepted; false for an unsupported shape.
      */
     set(data, silent = false) {
-        if (data && this.isPlainObject(data) && (!this.validator || this.validator(data))) {
-            this.modelData = data;
+        const rawData = this.toRaw(data);
+        if (rawData && this.isPlainObject(rawData) && (!this.validator || this.validator(rawData))) {
+            this.modelData = this.observe(rawData, []);
             if (!silent) {
                 this.message(['change', 'set'], this.get());
             }
@@ -67,8 +146,9 @@ class Model extends Utilities {
     }
     // the getter
     /**
-     * Return the stored data or the requested collection member without cloning it.
-     * @returns The backing data container or the selected member.
+     * Return deeply observable model data without cloning it.
+     * Direct property writes and deletes emit change and mutate events.
+     * @returns The observable backing data container.
      */
     get() {
         return this.modelData;
@@ -102,7 +182,7 @@ class Model extends Utilities {
      */
     delete(silent = false) {
         // Clearing owned state must not be rejected by an acceptance validator.
-        this.modelData = {};
+        this.modelData = this.observe({}, []);
         if (!silent) {
             this.message(['change', 'delete'], this.get());
         }

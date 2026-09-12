@@ -4,6 +4,7 @@ import Utilities = require('./utilities');
 declare class Model<T extends object = Record<string, unknown>> extends Utilities {
     modelData: Partial<T>;
     validator: ((data: unknown) => boolean) | undefined;
+    private readonly proxyTargets;
     /**
      * Create an instance with its own state and listener references.
      * @param modelData - Initial plain-object fields.
@@ -19,6 +20,19 @@ declare class Model<T extends object = Record<string, unknown>> extends Utilitie
      * @returns This instance after cleanup.
      */
     destroy(): this;
+    /** Return the raw object behind one of this model's observable proxies. */
+    private toRaw;
+    /** Return whether a nested value should participate in deep change tracking. */
+    private isObservable;
+    /** Prevent direct proxy writes from bypassing the same dangerous keys blocked by update(). */
+    private isBlockedKey;
+    /** Emit the existing full-state change event plus a path-specific mutation event. */
+    private notifyMutation;
+    /**
+     * Wrap one object lazily so reads only proxy the branch being accessed.
+     * No full-tree traversal or deep comparison occurs when state changes.
+     */
+    private observe;
     /**
      * Replace stored data when it has a supported shape; optionally suppress change notifications.
      * @param data - Data supplied by the caller; validation follows the method contract.
@@ -27,8 +41,9 @@ declare class Model<T extends object = Record<string, unknown>> extends Utilitie
      */
     set(data: unknown, silent?: boolean): boolean;
     /**
-     * Return the stored data or the requested collection member without cloning it.
-     * @returns The backing data container or the selected member.
+     * Return deeply observable model data without cloning it.
+     * Direct property writes and deletes emit change and mutate events.
+     * @returns The observable backing data container.
      */
     get(): Partial<T>;
     /**
