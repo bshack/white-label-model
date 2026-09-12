@@ -41,3 +41,12 @@ test('unvalidated array point updates avoid whole-array copying', () => {
 
     assert.ok(elapsed < 1000, `2000 point updates on a 100k-item array took ${elapsed.toFixed(1)}ms`);
 });
+
+test('validated array point updates still validate a candidate before mutating', () => {
+    const model = new Model([1, 2], value => value[0] !== 9);
+
+    assert.equal(model.update(0, 3, true), true);
+    assert.deepEqual(model.get(), [3, 2]);
+    assert.equal(model.update(0, 9, true), false);
+    assert.deepEqual(model.get(), [3, 2]);
+});
