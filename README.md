@@ -2,8 +2,6 @@
 
 `white-label-model` provides one observable `Model` for plain-object, array, or `Map` state. The same class and API run in browsers and Node.js server applications, handling keyed objects, ordered collections, and map collections while emitting predictable synchronous events.
 
-It does not require `window` or `document`, so server applications can use the same model code they use in browser bundles.
-
 ## Requirements
 
 - Node.js `^22.18.0` or `>=24.11.0`
