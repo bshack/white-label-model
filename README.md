@@ -2,18 +2,12 @@
 
 `white-label-model` provides one observable `Model` for plain-object, array, or `Map` state. The same class and API run in browsers and Node.js server applications, handling keyed objects, ordered collections, and map collections while emitting predictable synchronous events.
 
-It does not require `window` or `document`, so server applications can use the same model code they use in browser bundles.
-
 ## Requirements
 
 - Node.js `^22.18.0` or `>=24.11.0`
 - npm `>=11.0`
 - Native `Proxy` support for deep observation
 - Native `Map` support when using `Map` state
-
-## Versioning policy
-
-Backward compatibility is not maintained through aliases, deprecated signatures, placeholder arguments, fallback code paths, or other compatibility shims. Breaking public API changes are communicated with a Semantic Versioning major release and release notes outside this README.
 
 ## Install and import
 
@@ -46,8 +40,13 @@ const profile = new Model({
     preferences: {theme: 'light'}
 });
 
-profile.update({name: 'Grace'});
+profile.update({name: 'Grace'}); // => true
+profile.get();
+// => {id: 42, name: 'Grace', preferences: {theme: 'light'}}
+
 profile.get().preferences.theme = 'dark';
+profile.get();
+// => {id: 42, name: 'Grace', preferences: {theme: 'dark'}}
 ```
 
 ### Array
@@ -58,9 +57,21 @@ const tasks = new Model([
     {id: 2, complete: false}
 ]);
 
-tasks.update(1, {complete: true});
-tasks.push({id: 3, complete: false});
-tasks.delete(0);
+tasks.update(1, {complete: true}); // => true
+tasks.get();
+// => [{id: 1, complete: false}, {id: 2, complete: true}]
+
+tasks.push({id: 3, complete: false}); // => true
+tasks.get();
+// => [
+//      {id: 1, complete: false},
+//      {id: 2, complete: true},
+//      {id: 3, complete: false}
+//    ]
+
+tasks.delete(0); // => true
+tasks.get();
+// => [{id: 2, complete: true}, {id: 3, complete: false}]
 ```
 
 ### Map
@@ -70,9 +81,19 @@ const people = new Model(new Map([
     ['ada', {name: 'Ada'}]
 ]));
 
-people.push('grace', {name: 'Grace'});
-people.update('ada', {name: 'Ada Lovelace'});
-console.log(people.get('grace'));
+people.push('grace', {name: 'Grace'}); // => true
+people.get();
+// => Map(2) {
+//      'ada' => {name: 'Ada'},
+//      'grace' => {name: 'Grace'}
+//    }
+
+people.update('ada', {name: 'Ada Lovelace'}); // => true
+people.get();
+// => Map(2) {
+//      'ada' => {name: 'Ada Lovelace'},
+//      'grace' => {name: 'Grace'}
+//    }
 ```
 
 ## API
@@ -115,12 +136,35 @@ const model = new Model({
     }
 });
 
-model.on('mutate', ({operation, path, oldValue, newValue, state}) => {
-    console.log(operation, path, oldValue, newValue, state);
+let mutation;
+model.on('mutate', payload => {
+    mutation = payload;
 });
 
-model.get().user.profile.preferences.theme = 'dark';
-// path: ['user', 'profile', 'preferences', 'theme']
+model.get().user.profile.preferences.theme = 'dark'; // => 'dark'
+model.get();
+// => {
+//      user: {
+//          profile: {
+//              preferences: {theme: 'dark'}
+//          }
+//      }
+//    }
+
+mutation;
+// => {
+//      operation: 'set',
+//      path: ['user', 'profile', 'preferences', 'theme'],
+//      oldValue: 'light',
+//      newValue: 'dark',
+//      state: {
+//          user: {
+//              profile: {
+//                  preferences: {theme: 'dark'}
+//              }
+//          }
+//      }
+//    }
 ```
 
 A changed direct property write emits:
@@ -166,6 +210,36 @@ Remove a listener with the same callback reference:
 ```js
 model.removeListener('change', handleAnyChange);
 ```
+
+## Async work
+
+Model state changes and event emission are synchronous. Methods such as `set()`, `update()`, `push()`, and `delete()` complete before returning, so code can immediately read the resulting state and listeners observe the change in the same call stack.
+
+Keep asynchronous work outside the core mutation API and apply its result synchronously when it is ready:
+
+```js
+const data = await fetchData();
+model.set(data);
+
+model.get();
+// => the state produced from data
+```
+
+Application-specific async behavior can also live in a subclass or other wrapper without changing the core Model contract:
+
+```js
+class UserModel extends Model {
+    async load() {
+        const response = await fetch('/user');
+        const data = await response.json();
+
+        this.set(data);
+        return this.get();
+    }
+}
+```
+
+This keeps I/O, retries, cancellation, and transport concerns outside Model while preserving deterministic synchronous state updates.
 
 ## Runtime validation
 
@@ -250,7 +324,7 @@ TypeScript types do not validate untrusted runtime data; use the optional valida
 
 ## Event backend compatibility
 
-The test suite loads both Node's EventEmitter implementation and the npm browser implementation against the same event contract. It also runs the model with no `window` or `document` globals to enforce the server-runtime contract. See `docs/events-compatibility.md` for the covered behavior and limitations. These checks do not replace application-level browser integration testing.
+The test suite loads both Node's EventEmitter implementation and the npm browser implementation against the same event contract. It also runs the model with no `window` or `document` globals to enforce the server-runtime contract. See `docs/events-compatibility.md` for the covered behavior and limitations.
 
 ## Development and verification
 
@@ -268,4 +342,4 @@ npm pack --dry-run
 
 Implementation code lives in `src/`; generated JavaScript, source maps, and declarations live in `dist/`. Edit TypeScript sources and regenerate `dist`; do not hand-edit generated output.
 
-The package has no runtime dependency on White Label Mediator, View, Router, or Service. Consuming applications own integration testing for the package versions they select.
+The package can be installed and used independently; it has no runtime dependency on the other White Label packages.
