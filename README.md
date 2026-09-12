@@ -66,7 +66,6 @@ const people = new Model(new Map([
 
 people.push('grace', {name: 'Grace'});
 people.update('ada', {name: 'Ada Lovelace'});
-console.log(people.get('grace'));
 ```
 
 ## API
