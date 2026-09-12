@@ -153,6 +153,9 @@ describe('Unified Model', () => {
     it('rejects deletes that fail validation', () => {
         const object = new Model({required: true}, value => value.required === true);
         assert.equal(object.delete('required'), false);
+        const numbered = new Model({2: 'two', required: true}, value => value.required === true);
+        assert.equal(numbered.delete(2), true);
+        assert.deepEqual(numbered.get(), {required: true});
         const array = new Model(['required'], value => value.length > 0);
         assert.equal(array.delete(0), false);
         const map = new Model(new Map([['required', true]]), value => value.has('required'));
