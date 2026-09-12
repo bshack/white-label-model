@@ -1,8 +1,8 @@
 # white-label-model
 
-`white-label-model` provides one observable `Model` for plain-object, array, or `Map` state. The same class handles keyed objects, ordered collections, and map collections while emitting predictable synchronous events.
+`white-label-model` provides one observable `Model` for plain-object, array, or `Map` state. The same class and API run in browsers and Node.js server applications, handling keyed objects, ordered collections, and map collections while emitting predictable synchronous events.
 
-The package has no DOM or generated HTML. Accessibility and search behavior remain responsibilities of the consuming application.
+The package has no DOM or generated HTML. It does not require `window` or `document`, so server applications can use the same model code they use in browser bundles. Accessibility and search behavior remain responsibilities of the consuming application.
 
 ## Requirements
 
@@ -32,6 +32,8 @@ CommonJS:
 ```js
 const {Model} = require('white-label-model');
 ```
+
+The import and runtime API are the same on the client and server. For request-specific state, create a model per request or otherwise scope it to the intended lifetime rather than sharing mutable request data globally.
 
 ## One model, three root shapes
 
@@ -248,7 +250,7 @@ TypeScript types do not validate untrusted runtime data; use the optional valida
 
 ## Event backend compatibility
 
-The test suite loads both Node's EventEmitter implementation and the npm browser implementation against the same event contract. See `docs/events-compatibility.md` for the covered behavior and limitations. These Node-based checks do not replace application-level browser integration testing.
+The test suite loads both Node's EventEmitter implementation and the npm browser implementation against the same event contract. It also runs the model with no `window` or `document` globals to enforce the server-runtime contract. See `docs/events-compatibility.md` for the covered behavior and limitations. These checks do not replace application-level browser integration testing.
 
 ## Development and verification
 
