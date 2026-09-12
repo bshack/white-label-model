@@ -191,19 +191,47 @@ The timing check is a regression guard, not a universal performance guarantee. R
 
 ## Events
 
-Successful non-silent explicit mutations emit `change` followed by their operation-specific event.
+Successful non-silent explicit mutations emit `change` followed by their operation-specific event. The callback data for `change`, `set`, `update`, `push`, `delete`, and `clear` is the complete current state. The `mutate` event uses a structured payload describing the direct proxy mutation.
 
 ```js
-model.on('change', handleAnyChange);
-model.on('set', handleReplacement);
-model.on('update', handleUpdate);
-model.on('push', handleAppend);
-model.on('delete', handleDeletion);
-model.on('clear', handleClear);
-model.on('mutate', handleDirectMutation);
+model.on('change', state => {
+    // state => {name: 'Grace'}
+});
+
+model.on('set', state => {
+    // state => {name: 'Grace'}
+});
+
+model.on('update', state => {
+    // state => {name: 'Grace'}
+});
+
+model.on('push', state => {
+    // state => [{id: 1}, {id: 2}]
+});
+
+model.on('delete', state => {
+    // state => [{id: 2}]
+});
+
+model.on('clear', state => {
+    // state => []
+});
+
+model.on('mutate', payload => {
+    // payload => {
+    //     operation: 'set',
+    //     path: ['preferences', 'theme'],
+    //     oldValue: 'light',
+    //     newValue: 'dark',
+    //     state: {
+    //         preferences: {theme: 'dark'}
+    //     }
+    // }
+});
 ```
 
-Operation-specific listeners receive the complete current state. Direct proxy mutation listeners receive the path-specific `mutate` payload described above.
+The state examples above illustrate the callback shape for each binding; the exact state reflects the model at the time that event is emitted.
 
 Remove a listener with the same callback reference:
 
@@ -267,6 +295,8 @@ Direct assignments through the observable proxy returned by `get()` do **not** r
 
 ## Relay events through a mediator
 
+Mediator integration is optional. Model does not import or require `white-label-mediator`; any EventEmitter-compatible object can be assigned to `model.mediator`.
+
 Set both `name` and `mediator` to relay local events as `model:<name>:<event>` regardless of root shape:
 
 ```js
@@ -279,12 +309,20 @@ const session = new Model({authenticated: false});
 session.name = 'session';
 session.mediator = mediator;
 
-mediator.on('model:session:update', data => {
-    console.log('Session changed:', data);
+let relayedState;
+mediator.on('model:session:update', state => {
+    relayedState = state;
 });
 
-session.update({authenticated: true});
+session.update({authenticated: true}); // => true
+session.get();
+// => {authenticated: true}
+
+relayedState;
+// => {authenticated: true}
 ```
+
+The relay uses the same synchronous event flow as Model's local events. Applications can use White Label Mediator, another compatible event emitter, or no mediator at all.
 
 ## Extend Model
 
