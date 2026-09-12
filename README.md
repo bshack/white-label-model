@@ -312,4 +312,4 @@ npm pack --dry-run
 
 Implementation code lives in `src/`; generated JavaScript, source maps, and declarations live in `dist/`. Edit TypeScript sources and regenerate `dist`; do not hand-edit generated output.
 
-The package has no runtime dependency on White Label Mediator, View, Router, or Service. Consuming applications own integration testing for the package versions they select.
+The package has no runtime dependency on White Label Mediator, View, Router, or Service.
