@@ -30,6 +30,7 @@ class Utilities extends events_1.default {
     }
     /**
      * Accept finite numbers without coercing strings or other values.
+     * @deprecated Use Number.isFinite directly; retained for compatibility.
      * @param number - Numeric value to inspect or format.
      * @returns Whether the value is a finite number.
      */
@@ -37,7 +38,7 @@ class Utilities extends events_1.default {
         return Number.isFinite(number);
     }
     /**
-     * Accept ordinary objects and objects with a null prototype, excluding class instances.
+     * Accept ordinary objects and objects with a null prototype, including ordinary objects from another realm.
      * @param object - Value to inspect without coercion.
      * @returns Whether the value is a plain object.
      */
@@ -46,10 +47,18 @@ class Utilities extends events_1.default {
             return false;
         }
         const prototype = Object.getPrototypeOf(object);
-        return prototype === null || prototype === Object.prototype;
+        if (prototype === null) {
+            return true;
+        }
+        const constructor = Object.prototype.hasOwnProperty.call(prototype, 'constructor')
+            ? prototype.constructor
+            : undefined;
+        return typeof constructor === 'function' &&
+            Function.prototype.toString.call(constructor) === Function.prototype.toString.call(Object);
     }
     /**
      * Remove one array member in place and return the original array.
+     * @deprecated Use Array.prototype.splice directly; retained for compatibility.
      * @param data - Data supplied by the caller; validation follows the method contract.
      * @param index - Array position or Map key; omission selects the whole collection.
      * @returns The same array after removing one member.
