@@ -40,8 +40,13 @@ const profile = new Model({
     preferences: {theme: 'light'}
 });
 
-profile.update({name: 'Grace'});
+profile.update({name: 'Grace'}); // => true
+profile.get();
+// => {id: 42, name: 'Grace', preferences: {theme: 'light'}}
+
 profile.get().preferences.theme = 'dark';
+profile.get();
+// => {id: 42, name: 'Grace', preferences: {theme: 'dark'}}
 ```
 
 ### Array
@@ -52,9 +57,21 @@ const tasks = new Model([
     {id: 2, complete: false}
 ]);
 
-tasks.update(1, {complete: true});
-tasks.push({id: 3, complete: false});
-tasks.delete(0);
+tasks.update(1, {complete: true}); // => true
+tasks.get();
+// => [{id: 1, complete: false}, {id: 2, complete: true}]
+
+tasks.push({id: 3, complete: false}); // => true
+tasks.get();
+// => [
+//      {id: 1, complete: false},
+//      {id: 2, complete: true},
+//      {id: 3, complete: false}
+//    ]
+
+tasks.delete(0); // => true
+tasks.get();
+// => [{id: 2, complete: true}, {id: 3, complete: false}]
 ```
 
 ### Map
@@ -64,8 +81,19 @@ const people = new Model(new Map([
     ['ada', {name: 'Ada'}]
 ]));
 
-people.push('grace', {name: 'Grace'});
-people.update('ada', {name: 'Ada Lovelace'});
+people.push('grace', {name: 'Grace'}); // => true
+people.get();
+// => Map(2) {
+//      'ada' => {name: 'Ada'},
+//      'grace' => {name: 'Grace'}
+//    }
+
+people.update('ada', {name: 'Ada Lovelace'}); // => true
+people.get();
+// => Map(2) {
+//      'ada' => {name: 'Ada Lovelace'},
+//      'grace' => {name: 'Grace'}
+//    }
 ```
 
 ## API
