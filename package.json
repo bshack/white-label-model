@@ -1,7 +1,7 @@
 {
   "name": "white-label-model",
   "version": "6.0.0",
-  "description": "A unified observable data model for plain objects, arrays, and Maps.",
+  "description": "A browser/Node observable data model for plain objects, arrays, and Maps.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -14,7 +14,7 @@
   "files": ["dist", "README.md"],
   "engines": {"node": "^22.18.0 || >=24.11.0", "npm": ">=11.0"},
   "packageManager": "npm@11.19.1",
-  "keywords": ["javascript", "typescript", "model", "state", "observable", "proxy", "events", "map", "collection"],
+  "keywords": ["javascript", "typescript", "model", "state", "observable", "proxy", "events", "map", "collection", "browser", "node", "server-side", "universal"],
   "contributors": [{"name": "Bill Shackelford", "url": "https://github.com/bshack"}],
   "scripts": {
     "build": "tsc -p tsconfig.json",
