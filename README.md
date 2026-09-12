@@ -294,7 +294,7 @@ TypeScript types do not validate untrusted runtime data; use the optional valida
 
 ## Event backend compatibility
 
-The test suite loads both Node's EventEmitter implementation and the npm browser implementation against the same event contract. It also runs the model with no `window` or `document` globals to enforce the server-runtime contract. See `docs/events-compatibility.md` for the covered behavior and limitations. These checks do not replace application-level browser integration testing.
+The test suite loads both Node's EventEmitter implementation and the npm browser implementation against the same event contract. It also runs the model with no `window` or `document` globals to enforce the server-runtime contract. See `docs/events-compatibility.md` for the covered behavior and limitations.
 
 ## Development and verification
 
