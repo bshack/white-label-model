@@ -267,6 +267,8 @@ Direct assignments through the observable proxy returned by `get()` do **not** r
 
 ## Relay events through a mediator
 
+Mediator integration is optional. Model does not import or require `white-label-mediator`; any EventEmitter-compatible object can be assigned to `model.mediator`.
+
 Set both `name` and `mediator` to relay local events as `model:<name>:<event>` regardless of root shape:
 
 ```js
@@ -279,12 +281,20 @@ const session = new Model({authenticated: false});
 session.name = 'session';
 session.mediator = mediator;
 
-mediator.on('model:session:update', data => {
-    console.log('Session changed:', data);
+let relayedState;
+mediator.on('model:session:update', state => {
+    relayedState = state;
 });
 
-session.update({authenticated: true});
+session.update({authenticated: true}); // => true
+session.get();
+// => {authenticated: true}
+
+relayedState;
+// => {authenticated: true}
 ```
+
+The relay uses the same synchronous event flow as Model's local events. Applications can use White Label Mediator, another compatible event emitter, or no mediator at all.
 
 ## Extend Model
 
