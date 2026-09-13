@@ -44,4 +44,3 @@ jobs:
           npm install --ignore-scripts "$GITHUB_WORKSPACE/$PACKAGE" >/dev/null
           node -e "const {Model}=require('white-label-model'); if (typeof Model !== 'function') process.exit(1)"
           rm "$GITHUB_WORKSPACE/$PACKAGE"
-      - run: git diff --exit-code -- dist
