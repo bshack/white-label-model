@@ -16,7 +16,6 @@ Use it independently or compose it with the rest of White Label:
 - [`white-label-mediator`](https://github.com/bshack/white-label-mediator) can receive namespaced Model events without becoming a Model dependency.
 - [`white-label-router`](https://github.com/bshack/white-label-router) can turn URLs into application intent that updates state.
 - [`generator-white-label`](https://github.com/bshack/white-label) creates a working project showing the pieces together.
-- [`white-label-demo-site`](https://github.com/bshack/white-label-demo-site) is the complete documentation and live-example reference.
 
 The package has no runtime dependency on the other White Label packages.
 
