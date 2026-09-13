@@ -51,6 +51,7 @@ const profile = new Model({
     preferences: {theme: 'light'}
 });
 
+// `change` receives the complete current state after an accepted mutation.
 profile.on('change', state => {
     console.log(state);
 });
@@ -97,18 +98,19 @@ people.update('ada', {name: 'Ada Lovelace'});
 
 ## Public API
 
-| Method | Behavior |
-| --- | --- |
-| `get()` | Return the complete current state. |
-| `get(key)` | Read an object property, array index, or Map value. |
-| `set(data, silent?)` | Replace the root with any supported shape. |
-| `update(...)` | Merge object fields or replace/merge one array or Map member. |
-| `push(...)` | Append array values or add Map entries. |
-| `delete(key, silent?)` | Delete one object property, array index, or Map entry. |
-| `clear(silent?)` | Reset to an empty value of the current root shape. |
-| `destroy()` | Clear silently and release listeners. |
+| Method | Behavior | Returns |
+| --- | --- | --- |
+| `initialize()` | Start the instance for lifecycle chaining. | The same `Model` instance. |
+| `get()` | Return the complete current state. | The observable object, array, or `Map` root. |
+| `get(key)` | Read an object property, array index, or Map value. | The matching value, or `undefined` when the key/index does not resolve. |
+| `set(data, silent?)` | Replace the root with any supported shape. | `true` when accepted; `false` for unsupported or validator-rejected data. |
+| `update(...)` | Merge object fields or replace/merge one array or Map member. | `true` when accepted; `false` for an invalid call, missing member, or validator rejection. |
+| `push(...)` | Append array values or add Map entries. | `true` when accepted; `false` for an invalid call, object state, or validator rejection. |
+| `delete(key, silent?)` | Delete one object property, array index, or Map entry. | `true` when removed; `false` when the member does not exist or validation rejects the result. |
+| `clear(silent?)` | Reset to an empty value of the current root shape. | Always `true`. |
+| `destroy()` | Clear silently and release listeners. | The same `Model` instance after cleanup. |
 
-Explicit mutation methods return `true` when accepted and `false` when rejected. Passing `true` as the final `silent` argument suppresses events.
+Passing `true` as the final `silent` argument suppresses events. Mutation methods are synchronous: their return value is available only after validation and the accepted state change have completed.
 
 `update()` shallow-merges plain objects and blocks `__proto__`, `constructor`, and `prototype` from merge input. It does not recursively merge nested objects.
 
@@ -118,11 +120,11 @@ Successful non-silent explicit mutations emit `change` followed by their operati
 
 ```js
 model.on('change', state => {
-    // complete current state
+    // `state` is the complete current state.
 });
 
 model.on('update', state => {
-    // complete current state after update()
+    // `state` is the complete current state after update().
 });
 ```
 
