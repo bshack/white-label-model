@@ -13,7 +13,6 @@
   },
   "files": ["dist", "README.md"],
   "engines": {"node": "^22.18.0 || >=24.11.0"},
-  "packageManager": "npm@11.19.1",
   "keywords": ["javascript", "typescript", "model", "state", "observable", "proxy", "events", "map", "collection", "browser", "node", "server-side", "universal"],
   "contributors": [{"name": "Bill Shackelford", "url": "https://github.com/bshack"}],
   "scripts": {
