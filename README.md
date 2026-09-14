@@ -22,7 +22,7 @@ The package has no runtime dependency on the other White Label packages.
 ## Requirements
 
 - Node.js `^22.18.0` or `>=24.11.0`
-- npm `>=11.0`
+- npm, Yarn, and pnpm are supported for installation; see [`PACKAGE_MANAGERS.md`](PACKAGE_MANAGERS.md)
 - Native `Proxy` support for deep observation
 - Native `Map` support when using `Map` state
 
@@ -30,6 +30,8 @@ The package has no runtime dependency on the other White Label packages.
 
 ```sh
 npm install white-label-model
+# or: yarn add white-label-model
+# or: pnpm add white-label-model
 ```
 
 ```js
@@ -199,7 +201,7 @@ const data = await fetchData();
 model.set(data);
 ```
 
-Application-specific async behavior can live in a subclass or service without changing the Model contract.
+The legacy `serviceGet()`, `servicePatch()`, `servicePost()`, and `servicePut()` methods remain no-I/O compatibility placeholders and resolve `{}`. New application networking should stay in application-owned services rather than extending Model's responsibility.
 
 ## Mediator integration
 
@@ -256,7 +258,7 @@ npm run audit
 npm pack --dry-run
 ```
 
-Coverage enforces 100% statements, branches, functions, and lines per implementation file. CI rebuilds committed `dist` output and rejects generated-file drift.
+Coverage enforces 100% statements, branches, functions, and lines per implementation file. CI builds authored source, uploads generated package artifacts for inspection, audits dependencies, packs the package, and verifies the packed public API across npm, Yarn, and pnpm.
 
 Implementation lives in `src/`; generated JavaScript, source maps, and declarations live in `dist/`. Edit TypeScript sources and regenerate `dist` rather than hand-editing generated output.
 
