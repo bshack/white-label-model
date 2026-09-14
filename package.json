@@ -2,6 +2,7 @@
   "name": "white-label-model",
   "version": "6.0.0",
   "description": "A browser/Node observable data model for plain objects, arrays, and Maps.",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -25,7 +26,7 @@
     "lint:fix": "node --run lint -- --fix",
     "test:unit": "node --test test/*.test.js",
     "coverage": "node --run build && node --run test:types && c8 node --run test:unit",
-    "prepack": "node --run build",
+    "prepare": "node --run build",
     "test:types": "tsc -p tsconfig.consumer.json"
   },
   "repository": {"type": "git", "url": "git+https://github.com/bshack/white-label-model.git"},
