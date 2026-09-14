@@ -2,7 +2,9 @@
 
 > Observable state without a state framework.
 
-`white-label-model` gives object, array, and `Map` state one small observable API. Mutations are synchronous, nested changes are observable, validation is optional, and the same class runs in browsers and Node.js.
+`white-label-model` is a lightweight observable TypeScript state-management library for plain objects, arrays, and `Map` state in browser and Node.js applications. Mutations are synchronous, nested changes are observable, validation is optional, and the same class works without a frontend framework.
+
+[Documentation](https://whitelabeljs.org/docs/model/) · [API reference](https://whitelabeljs.org/api/#model) · [Demo site](https://whitelabeljs.org/)
 
 **Responsibility:** own application state and describe when it changes. Nothing more.
 
