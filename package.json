@@ -1,7 +1,7 @@
 {
   "name": "white-label-model",
   "version": "6.0.0",
-  "description": "A browser/Node observable data model for plain objects, arrays, and Maps.",
+  "description": "Lightweight observable TypeScript state management for plain objects, arrays, and Maps in browser and Node.js applications.",
   "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,7 @@
   },
   "files": ["dist", "README.md"],
   "engines": {"node": "^22.18.0 || >=24.11.0"},
-  "keywords": ["javascript", "typescript", "model", "state", "observable", "proxy", "events", "map", "collection", "browser", "node", "server-side", "universal"],
+  "keywords": ["javascript", "typescript", "model", "state", "state-management", "observable", "proxy", "events", "map", "collection", "browser", "node", "server-side", "universal", "framework-independent"],
   "contributors": [{"name": "Bill Shackelford", "url": "https://github.com/bshack"}],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -33,7 +33,7 @@
   "author": {"name": "Bill Shackelford", "url": "https://github.com/bshack"},
   "license": "MIT",
   "bugs": {"url": "https://github.com/bshack/white-label-model/issues"},
-  "homepage": "https://github.com/bshack/white-label-model#readme",
+  "homepage": "https://whitelabeljs.org/docs/model/",
   "dependencies": {"events": "3.3.0"},
   "devDependencies": {
     "@babel/core": "8.0.5",
