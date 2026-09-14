@@ -24,4 +24,4 @@ Breaking public API changes require a SemVer major release rather than compatibi
 
 ## Security
 
-Treat validator boundaries and untrusted state carefully. Do not include real secrets or sensitive data in tests or documentation. Follow `SECURITY.md` for suspected vulnerabilities.
+Treat runtime state boundaries carefully. The optional Model validator is a caller-supplied whole-state acceptance check: Model passes it the complete proposed state before construction or an explicit mutation is accepted, and a `false` result rejects that state. It is most useful for untrusted runtime data such as API, storage, or user input; it is not required for every Model. Direct nested writes through `get()` bypass this whole-state validator. Do not include real secrets or sensitive data in tests or documentation. Follow `SECURITY.md` for suspected vulnerabilities.
