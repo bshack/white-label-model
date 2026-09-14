@@ -244,6 +244,16 @@ TypeScript describes expected values to the compiler but does not validate data 
 
 Deep observation is lazy and does not impose a configured nesting-depth limit. The regression suite covers very deep paths, unrelated throwing getters, 20,000 unrelated properties, and repeated observed nested writes. Timing tests are regression guards rather than universal performance guarantees; application listeners, validation, path depth, and runtime conditions still matter.
 
+## Serverless and function runtimes
+
+Use a request-scoped Model for mutable request data. Serverless platforms can reuse one warm process for many sequential or overlapping invocations, so a module-level Model can retain state or listeners from an earlier request unless that shared lifetime is explicitly intended.
+
+Keep persistence outside Model. Load data through the application-owned database, cache, API, object store, or other service, validate external values at the appropriate trust boundary, apply the result with normal synchronous Model operations, and let the request-owned Model end with the invocation.
+
+Immutable configuration may live at module scope when useful. The important boundary is mutable application/request state, not whether code happens to execute in a function runtime.
+
+The package currently documents Node.js as its supported server runtime. The browser-compatible EventEmitter implementation is useful for portability, but it is not a blanket compatibility claim for every edge provider; verify the actual target runtime before deployment.
+
 ## Event compatibility
 
 Tests exercise both Node's EventEmitter implementation and the npm browser implementation against the same event contract, and run Model without `window` or `document` globals. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
