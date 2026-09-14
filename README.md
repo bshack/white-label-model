@@ -168,7 +168,9 @@ Direct writes to `__proto__`, `constructor`, and `prototype` are rejected.
 
 ## Runtime validation
 
-Pass an optional validator when explicit state changes must satisfy a runtime contract:
+A validator is optional. Most Models do not need one when the application already controls the values being written.
+
+Use a validator when actual runtime data needs to be checked before Model accepts it—for example data from an API, storage, decoded JSON, or user input. The validator is a caller-supplied function that receives the **complete proposed state**. Return `true` to accept that state or `false` to reject it.
 
 ```ts
 const user = new Model({name: 'Ada'}, value =>
@@ -177,11 +179,16 @@ const user = new Model({name: 'Ada'}, value =>
     !Array.isArray(value) &&
     typeof (value as {name?: unknown}).name === 'string'
 );
+
+user.set({name: 'Grace'}); // => true; state is accepted
+user.set({name: 42});      // => false; state is unchanged
 ```
 
-Validation applies to construction, `set()`, `update()`, `push()`, and `delete()`. Invalid construction throws `TypeError`; invalid later mutations return `false` without changing state.
+Model runs the validator before initial construction and before explicit `set()`, `update()`, `push()`, and `delete()` changes are committed. Invalid construction throws `TypeError`; a rejected later mutation returns `false` without changing state.
 
-Direct assignments through `get()` do not run the whole-state validator. Use explicit mutation methods when validation is required. `clear()` and `destroy()` intentionally bypass acceptance validation so cleanup cannot be blocked.
+The validator is a whole-state acceptance check, not a field-by-field schema system. Direct nested assignments through `get()` remain observable but do **not** run the whole-state validator. Use the explicit mutation methods when runtime validation must be enforced. `clear()` and `destroy()` intentionally bypass acceptance validation so cleanup cannot be blocked.
+
+TypeScript and the validator solve different problems: TypeScript checks code at development time, while the optional validator checks the actual values present at runtime.
 
 ## Async work stays outside state mutation
 
@@ -227,7 +234,7 @@ const tasks = new Model<Array<{id: number; complete: boolean}>>([]);
 const people = new Model<Map<string, {name: string}>>(new Map());
 ```
 
-TypeScript does not validate untrusted runtime data; use the optional validator when that boundary matters.
+TypeScript describes expected values to the compiler but does not validate data arriving at runtime. Add the optional validator only when that runtime boundary needs an acceptance check.
 
 ## Performance model
 
