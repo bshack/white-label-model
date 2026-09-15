@@ -33,6 +33,16 @@ class Utilities extends EventTarget {
         super.addEventListener(type, callback, {...settings, signal});
     }
 
+    /** Normalize capture removal so supported Node runtimes match browser EventTarget behavior. */
+    override removeEventListener(
+        type: string,
+        callback: EventListenerOrEventListenerObject | null,
+        options?: boolean | EventListenerOptions
+    ): void {
+        const capture = typeof options === 'boolean' ? options : Boolean(options?.capture);
+        super.removeEventListener(type, callback, {capture});
+    }
+
     /** Release every locally owned listener while leaving the EventTarget reusable. */
     protected resetEventListeners(): void {
         this.#listenerController.abort();
