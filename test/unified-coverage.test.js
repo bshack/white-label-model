@@ -13,8 +13,8 @@ test('observable Map exposes native reads, iteration, callbacks, and mutations',
     const map = model.get();
     const changes = [];
     const mutations = [];
-    model.on('change', state => changes.push(state));
-    model.on('mutate', mutation => mutations.push(mutation));
+    model.addEventListener('change', event => changes.push(event.detail));
+    model.addEventListener('mutate', event => mutations.push(event.detail));
 
     assert.equal(map.size, 2);
     assert.equal(map.has('number'), true);
