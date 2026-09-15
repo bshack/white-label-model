@@ -55,7 +55,6 @@ const profile = new Model({
     preferences: {theme: 'light'}
 });
 
-// `change` carries the complete current state in CustomEvent.detail.
 profile.addEventListener('change', event => {
     console.log(event.detail);
 });
@@ -224,7 +223,7 @@ const data = await fetchData();
 model.set(data);
 ```
 
-Model 7 intentionally has no service/fetch compatibility methods. Keeping transport outside Model makes its state contract the same in browser, server, test, and request-scoped code.
+Networking and persistence remain application-owned concerns, which keeps Model's state contract consistent in browser, server, test, and request-scoped code.
 
 ## Mediator integration
 
@@ -252,28 +251,6 @@ session.update({authenticated: true});
 ```
 
 This is composition, not coupling: another compatible EventTarget—or no mediator at all—works equally well.
-
-### Migrating from Model 6
-
-Model 7 standardizes both local Model events and optional mediator relays on EventTarget/CustomEvent.
-
-Replace local EventEmitter-style subscriptions:
-
-```js
-// Model 6
-model.on('change', state => render(state));
-model.once('change', state => initialize(state));
-model.removeListener('change', handleChange);
-
-// Model 7
-model.addEventListener('change', event => render(event.detail));
-model.addEventListener('change', event => initialize(event.detail), {once: true});
-model.removeEventListener('change', handleChange);
-```
-
-If application code supplied an EventEmitter-compatible `model.mediator`, replace it with an EventTarget-compatible object. Namespaced relay subscribers likewise receive a `CustomEvent` and read the original payload from `event.detail`.
-
-EventEmitter-only APIs such as `emit`, `on`, `once`, `addListener`, `off`, `removeListener`, listener inspection, prepend methods, symbol event names, max-listener settings, and EventEmitter's special `error` behavior are not part of the Model 7 event contract.
 
 ## TypeScript
 
@@ -307,9 +284,9 @@ Immutable configuration may live at module scope when useful. The important boun
 
 The package currently documents Node.js as its supported server runtime. Its standards-based EventTarget/CustomEvent event boundary is portable to modern browser runtimes, but verify the actual target runtime before deployment.
 
-## Event compatibility
+## Event contract
 
-Model's local event contract and optional mediator relay now use the same EventTarget/CustomEvent semantics. The regression suite covers native listener options, cancellation return semantics, synchronous event ordering, payload identity, destroy cleanup, reuse after destroy, object/array/Map state, deep mutation detail, detached-root behavior, and browser-facing behavior. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
+Model's local event contract and optional mediator relay use the same EventTarget/CustomEvent semantics. The regression suite covers native listener options, cancellation return semantics, synchronous event ordering, payload identity, destroy cleanup, reuse after destroy, object/array/Map state, deep mutation detail, detached-root behavior, and browser-facing behavior. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
 
 ## Development
 
