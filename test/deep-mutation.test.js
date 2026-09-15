@@ -13,8 +13,8 @@ describe('Model deep mutation tracking', function() {
         });
         const changes = mock.fn();
         const mutations = mock.fn();
-        model.on('change', changes);
-        model.on('mutate', mutations);
+        model.addEventListener('change', changes);
+        model.addEventListener('mutate', event => mutations(event.detail));
 
         model.get().user.profile.preferences.theme = 'dark';
 
@@ -33,7 +33,7 @@ describe('Model deep mutation tracking', function() {
     it('tracks property deletion and ignores deletion of a missing property', function() {
         const model = new Model({settings: {mode: 'compact'}});
         const mutations = mock.fn();
-        model.on('mutate', mutations);
+        model.addEventListener('mutate', event => mutations(event.detail));
 
         delete model.get().settings.mode;
         delete model.get().settings.missing;
@@ -48,7 +48,7 @@ describe('Model deep mutation tracking', function() {
     it('does not emit when assigning the same value', function() {
         const model = new Model({settings: {mode: 'compact'}});
         const mutations = mock.fn();
-        model.on('mutate', mutations);
+        model.addEventListener('mutate', event => mutations(event.detail));
 
         model.get().settings.mode = 'compact';
 
@@ -58,7 +58,7 @@ describe('Model deep mutation tracking', function() {
     it('tracks array index writes and mutating array methods lazily', function() {
         const model = new Model({items: ['first']});
         const mutations = [];
-        model.on('mutate', mutation => mutations.push(mutation));
+        model.addEventListener('mutate', event => mutations.push(event.detail));
 
         model.get().items.push('second');
         model.get().items[0] = 'updated';
@@ -92,7 +92,7 @@ describe('Model deep mutation tracking', function() {
         const key = Symbol('state');
         const model = new Model({});
         const mutations = mock.fn();
-        model.on('mutate', mutations);
+        model.addEventListener('mutate', event => mutations(event.detail));
 
         model.get()[key] = {enabled: true};
         model.get()[key].enabled = false;
@@ -121,7 +121,7 @@ describe('Model deep mutation tracking', function() {
         const locked = Object.freeze({value: 1});
         const model = new Model({locked});
         const mutations = mock.fn();
-        model.on('mutate', mutations);
+        model.addEventListener('mutate', event => mutations(event.detail));
 
         assert.throws(() => {
             model.get().locked.value = 2;
@@ -139,7 +139,7 @@ describe('Model deep mutation tracking', function() {
         });
         const model = new Model({locked});
         const mutations = mock.fn();
-        model.on('mutate', mutations);
+        model.addEventListener('mutate', event => mutations(event.detail));
 
         assert.throws(() => {
             delete model.get().locked.value;
@@ -176,7 +176,7 @@ describe('Model deep mutation tracking', function() {
 
         const model = new Model(root);
         const mutations = mock.fn();
-        model.on('mutate', mutations);
+        model.addEventListener('mutate', event => mutations(event.detail));
         let observed = model.get();
         for (let index = 0; index < 64; index += 1) {
             observed = observed.next;
