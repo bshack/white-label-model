@@ -1,5 +1,28 @@
 /** @module src/utilities */
-import EventEmitter from 'events';
+import {EventEmitter as RuntimeEventEmitter} from 'events';
+
+type EventName = string | symbol;
+type EventListener = (...arguments_: unknown[]) => void;
+
+interface EventEmitterApi {
+    addListener(eventName: EventName, listener: EventListener): this;
+    on(eventName: EventName, listener: EventListener): this;
+    once(eventName: EventName, listener: EventListener): this;
+    removeListener(eventName: EventName, listener: EventListener): this;
+    off(eventName: EventName, listener: EventListener): this;
+    removeAllListeners(eventName?: EventName): this;
+    setMaxListeners(count: number): this;
+    getMaxListeners(): number;
+    listeners(eventName: EventName): EventListener[];
+    rawListeners(eventName: EventName): EventListener[];
+    emit(eventName: EventName, ...arguments_: unknown[]): boolean;
+    listenerCount(eventName: EventName): number;
+    prependListener(eventName: EventName, listener: EventListener): this;
+    prependOnceListener(eventName: EventName, listener: EventListener): this;
+    eventNames(): EventName[];
+}
+
+const EventEmitter = RuntimeEventEmitter as unknown as new () => EventEmitterApi;
 
 interface ApplicationMediator {
     dispatchEvent(event: Event): boolean;
@@ -17,42 +40,23 @@ class Utilities extends EventEmitter {
     name: string | false = false;
     mediator: ApplicationMediator | false = false;
 
-    /**
-     * Create an instance with its own state and listener references.
-     */
+    /** Create an instance with its own state and listener references. */
     constructor() {
-
         super();
-
-        // used for mediator messaging if in use
         this.label = '';
-
     }
 
-    /**
-     * Recognize native Map objects, including Maps created in another realm.
-     * @param object - Value to inspect without coercion.
-     * @returns Whether the value is a Map.
-     */
+    /** Recognize native Map objects, including Maps created in another realm. */
     isMap(object: unknown): object is Map<unknown, unknown> {
         return Object.prototype.toString.call(object) === '[object Map]';
     }
 
-    /**
-     * Accept finite numbers without coercing strings or other values.
-     * @deprecated Use Number.isFinite directly; retained for compatibility.
-     * @param number - Numeric value to inspect or format.
-     * @returns Whether the value is a finite number.
-     */
+    /** @deprecated Use Number.isFinite directly; retained for compatibility. */
     isFinite(number: unknown): number is number {
         return Number.isFinite(number);
     }
 
-    /**
-     * Accept ordinary objects and objects with a null prototype, including ordinary objects from another realm.
-     * @param object - Value to inspect without coercion.
-     * @returns Whether the value is a plain object.
-     */
+    /** Accept ordinary objects and objects with a null prototype, including ordinary objects from another realm. */
     isPlainObject(object: unknown): object is Record<string, unknown> {
         if (Object.prototype.toString.call(object) !== '[object Object]') {
             return false;
@@ -68,29 +72,14 @@ class Utilities extends EventEmitter {
             Function.prototype.toString.call(constructor) === Function.prototype.toString.call(Object);
     }
 
-    /**
-     * Remove one array member in place and return the original array.
-     * @deprecated Use Array.prototype.splice directly; retained for compatibility.
-     * @param data - Data supplied by the caller; validation follows the method contract.
-     * @param index - Array position or Map key; omission selects the whole collection.
-     * @returns The same array after removing one member.
-     */
+    /** @deprecated Use Array.prototype.splice directly; retained for compatibility. */
     pullAt<T>(data: T[], index: number): T[] {
         data.splice(index, 1);
         return data;
     }
 
-    /**
-     * Create a shallow merge using enumerable own properties while blocking prototype-pollution keys.
-     * The earlier source's prototype is retained so null-prototype state remains null-prototype state.
-     * @param object1 - Earlier merge source; null is ignored.
-     * @param object2 - Later merge source; null is ignored.
-     * @returns A new merged object without blocked prototype keys.
-     */
+    /** Create a shallow merge using enumerable own properties while blocking prototype-pollution keys. */
     extend(object1: Record<string, unknown> | null, object2: Record<string, unknown> | null): Record<string, unknown> {
-        // Copy only enumerable own, safe properties into a new object. In particular,
-        // never treat attacker-controlled prototype keys as data or mutate
-        // a caller-owned object while applying an update.
         const prototype = object1 ? Object.getPrototypeOf(object1) : Object.prototype;
         const result = Object.create(prototype) as Record<PropertyKey, unknown>;
         const blockedKeys = new Set(['__proto__', 'constructor', 'prototype']);
@@ -111,16 +100,9 @@ class Utilities extends EventEmitter {
         return result as Record<string, unknown>;
     }
 
-    /**
-     * Emit each local event and, when configured, dispatch a namespaced application event for truthy data.
-     * @param messages - Event names to emit in order.
-     * @param data - Data supplied by the caller; validation follows the method contract.
-     * @returns False for falsey data; true after emitting the requested events.
-     */
+    /** Emit each local event and, when configured, dispatch a namespaced application event for truthy data. */
     message(messages: string[], data: unknown): boolean {
-
         if (data) {
-
             for (const message of messages) {
                 this.emit(message, data);
                 if (this.name && this.mediator) {
@@ -130,18 +112,10 @@ class Utilities extends EventEmitter {
                     ));
                 }
             }
-
             return true;
-
-        } else {
-
-            return false;
-
         }
-
+        return false;
     }
-
-};
-
+}
 
 export = Utilities;
