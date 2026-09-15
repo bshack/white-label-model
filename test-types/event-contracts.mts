@@ -1,11 +1,13 @@
 import {Model} from '../dist/index.js';
 
-const model = new Model<{name: string; nested: {active: boolean}}>({
+type Profile = {name: string; nested: {active: boolean}};
+
+const model = new Model<Profile>({
     name: 'Ada',
     nested: {active: true}
 });
 
-const updateListener = (event: CustomEvent<{name: string; nested: {active: boolean}}>) => event.detail.name;
+const updateListener = (event: CustomEvent<Profile>) => event.detail.name;
 
 model.addEventListener('change', event => event.detail.name.toUpperCase());
 model.addEventListener('set', event => event.detail.nested.active, {once: true});
@@ -17,6 +19,17 @@ model.addEventListener('mutate', event => {
     event.detail.state.name;
 });
 model.dispatchEvent(new CustomEvent('change', {detail: model.get()}));
+
+const initialized = new Model<Profile>({
+    name: 'Grace',
+    nested: {active: false}
+}).initialize();
+initialized.addEventListener('change', event => event.detail.name.toUpperCase());
+initialized.addEventListener('update', updateListener);
+initialized.removeEventListener('update', updateListener);
+
+const reused = initialized.destroy();
+reused.addEventListener('set', event => event.detail.nested.active);
 
 // @ts-expect-error unknown model event names are rejected for typed listeners.
 model.addEventListener('missing', () => {});
