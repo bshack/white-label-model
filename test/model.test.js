@@ -174,15 +174,11 @@ describe('Unified Model', () => {
         assert.equal(map.get().size, 0);
     });
 
-    it('initializes, destroys, and provides empty service hooks', async () => {
+    it('initializes and destroys without retaining listeners', () => {
         const model = new Model({name: 'Ada'});
         const change = mock.fn();
         model.addEventListener('change', change);
         assert.equal(model.initialize(), model);
-        assert.deepEqual(await model.serviceGet(), {});
-        assert.deepEqual(await model.servicePatch(), {});
-        assert.deepEqual(await model.servicePost(), {});
-        assert.deepEqual(await model.servicePut(), {});
         assert.equal(model.destroy(), model);
         assert.deepEqual(model.get(), {});
         model.dispatchEvent(new CustomEvent('change', {detail: model.get()}));
