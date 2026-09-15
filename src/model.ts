@@ -18,6 +18,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
     modelData: T;
     validator: ((data: unknown) => boolean) | undefined;
     private readonly proxyTargets = new WeakMap<object, object>();
+    private generation = 0;
 
     /**
      * Create one observable state container for a plain object, array, or Map.
@@ -34,7 +35,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
         if (!this.accepts(initial)) {
             throw new TypeError('Initial model data failed validation.');
         }
-        this.modelData = this.observe(initial, []) as T;
+        this.modelData = this.observe(initial, [], this.generation) as T;
         this.label = 'model';
         this.mediator = false;
         this.name = false;
@@ -48,7 +49,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
     /** Release owned state and listeners so the instance can leave the application lifecycle. */
     destroy() {
         this.clear(true);
-        this.removeAllListeners();
+        this.resetEventListeners();
         return this;
     }
 
@@ -87,13 +88,15 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
         return !this.validator || this.validator(candidate);
     }
 
-    /** Emit the existing full-state change event plus a path-specific mutation event. */
+    /** Dispatch the full-state change event plus a path-specific mutation event for the current root only. */
     private notifyMutation(
+        generation: number,
         operation: ModelMutation<T>['operation'],
         path: unknown[],
         oldValue: unknown,
         newValue: unknown
     ): void {
+        if (generation !== this.generation) {return;}
         const state = this.get();
         const mutation: ModelMutation<T> = Object.freeze({
             operation,
@@ -102,51 +105,41 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
             newValue,
             state
         });
-        this.message(['change'], state);
-        this.message(['mutate'], mutation);
+        this.dispatchMessages(['change'], state);
+        this.dispatchMessages(['mutate'], mutation);
     }
 
     /** Observe plain objects and arrays lazily along accessed branches. */
-    private observeObject(value: object, path: unknown[]): object {
+    private observeObject(value: object, path: unknown[], generation: number): object {
         const childCache = new Map<PropertyKey, {raw: object; proxy: object}>();
         const proxy = new Proxy(value, {
             get: (target, property, receiver) => {
                 const result = Reflect.get(target, property, receiver);
                 const rawResult = this.toRaw(result);
-                if (!this.isObservable(rawResult)) {
-                    return result;
-                }
+                if (!this.isObservable(rawResult)) {return result;}
                 const cached = childCache.get(property);
-                if (cached && cached.raw === rawResult) {
-                    return cached.proxy;
-                }
-                const childProxy = this.observe(rawResult, path.concat(property));
+                if (cached && cached.raw === rawResult) {return cached.proxy;}
+                const childProxy = this.observe(rawResult, path.concat(property), generation);
                 childCache.set(property, {raw: rawResult, proxy: childProxy});
                 return childProxy;
             },
             set: (target, property, nextValue) => {
-                if (this.isBlockedKey(property)) {
-                    return false;
-                }
+                if (this.isBlockedKey(property)) {return false;}
                 const rawNextValue = this.toRaw(nextValue);
                 const oldValue = this.toRaw(Reflect.get(target, property, target));
-                if (Object.is(oldValue, rawNextValue)) {
-                    return true;
-                }
+                if (Object.is(oldValue, rawNextValue)) {return true;}
                 const applied = Reflect.set(target, property, rawNextValue, target);
                 if (applied) {
-                    this.notifyMutation('set', path.concat(property), oldValue, rawNextValue);
+                    this.notifyMutation(generation, 'set', path.concat(property), oldValue, rawNextValue);
                 }
                 return applied;
             },
             deleteProperty: (target, property) => {
-                if (!Object.prototype.hasOwnProperty.call(target, property)) {
-                    return true;
-                }
+                if (!Object.prototype.hasOwnProperty.call(target, property)) {return true;}
                 const oldValue = this.toRaw(Reflect.get(target, property, target));
                 const removed = Reflect.deleteProperty(target, property);
                 if (removed) {
-                    this.notifyMutation('delete', path.concat(property), oldValue, undefined);
+                    this.notifyMutation(generation, 'delete', path.concat(property), oldValue, undefined);
                 }
                 return removed;
             }
@@ -156,26 +149,20 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
     }
 
     /** Observe Map values and mutators without scanning unrelated entries. */
-    private observeMap(value: Map<unknown, unknown>, path: unknown[]): Map<unknown, unknown> {
+    private observeMap(value: Map<unknown, unknown>, path: unknown[], generation: number): Map<unknown, unknown> {
         const childCache = new Map<unknown, {raw: object; proxy: object}>();
         const observeValue = (key: unknown, item: unknown): unknown => {
             const rawItem = this.toRaw(item);
-            if (!this.isObservable(rawItem)) {
-                return item;
-            }
+            if (!this.isObservable(rawItem)) {return item;}
             const cached = childCache.get(key);
-            if (cached && cached.raw === rawItem) {
-                return cached.proxy;
-            }
-            const childProxy = this.observe(rawItem, path.concat(key));
+            if (cached && cached.raw === rawItem) {return cached.proxy;}
+            const childProxy = this.observe(rawItem, path.concat(key), generation);
             childCache.set(key, {raw: rawItem, proxy: childProxy});
             return childProxy;
         };
         const proxy = new Proxy(value, {
             get: (target, property) => {
-                if (property === 'size') {
-                    return target.size;
-                }
+                if (property === 'size') {return target.size;}
                 if (property === 'get') {
                     return (key: unknown) => observeValue(key, target.get(key));
                 }
@@ -184,37 +171,31 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
                         const rawNextValue = this.toRaw(nextValue);
                         const hadKey = target.has(key);
                         const oldValue = this.toRaw(target.get(key));
-                        if (hadKey && Object.is(oldValue, rawNextValue)) {
-                            return proxy;
-                        }
+                        if (hadKey && Object.is(oldValue, rawNextValue)) {return proxy;}
                         target.set(key, rawNextValue);
-                        this.notifyMutation('set', path.concat(key), oldValue, rawNextValue);
+                        this.notifyMutation(generation, 'set', path.concat(key), oldValue, rawNextValue);
                         return proxy;
                     };
                 }
                 if (property === 'delete') {
                     return (key: unknown) => {
-                        if (!target.has(key)) {
-                            return false;
-                        }
+                        if (!target.has(key)) {return false;}
                         const oldValue = this.toRaw(target.get(key));
                         const removed = target.delete(key);
                         if (removed) {
                             childCache.delete(key);
-                            this.notifyMutation('delete', path.concat(key), oldValue, undefined);
+                            this.notifyMutation(generation, 'delete', path.concat(key), oldValue, undefined);
                         }
                         return removed;
                     };
                 }
                 if (property === 'clear') {
                     return () => {
-                        if (target.size === 0) {
-                            return;
-                        }
+                        if (target.size === 0) {return;}
                         const oldValue = new Map(target);
                         target.clear();
                         childCache.clear();
-                        this.notifyMutation('clear', path, oldValue, target);
+                        this.notifyMutation(generation, 'clear', path, oldValue, target);
                     };
                 }
                 if (property === 'forEach') {
@@ -224,9 +205,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
                 }
                 if (property === 'values') {
                     return function* () {
-                        for (const [key, item] of target.entries()) {
-                            yield observeValue(key, item);
-                        }
+                        for (const [key, item] of target.entries()) {yield observeValue(key, item);}
                     };
                 }
                 if (property === 'entries' || property === Symbol.iterator) {
@@ -245,20 +224,19 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
     }
 
     /** Wrap one supported container lazily so mutations never require a full-tree scan. */
-    private observe(value: ModelData, path: unknown[]): object {
-        return this.isMap(value) ? this.observeMap(value, path) : this.observeObject(value, path);
+    private observe(value: ModelData, path: unknown[], generation: number): object {
+        return this.isMap(value)
+            ? this.observeMap(value, path, generation)
+            : this.observeObject(value, path, generation);
     }
 
     /** Replace all model state. */
     set(data: unknown, silent = false): boolean {
         const rawData = this.toRaw(data);
-        if (!this.isSupportedData(rawData) || !this.accepts(rawData)) {
-            return false;
-        }
-        this.modelData = this.observe(rawData, []) as T;
-        if (!silent) {
-            this.message(['change', 'set'], this.get());
-        }
+        if (!this.isSupportedData(rawData) || !this.accepts(rawData)) {return false;}
+        this.generation += 1;
+        this.modelData = this.observe(rawData, [], this.generation) as T;
+        if (!silent) {this.dispatchMessages(['change', 'set'], this.get());}
         return true;
     }
 
@@ -266,12 +244,8 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
     get(key: unknown): unknown;
     /** Return all state or one object property, array index, or Map entry. */
     get(key?: unknown): unknown {
-        if (arguments.length === 0) {
-            return this.modelData;
-        }
-        if (this.isMap(this.modelData)) {
-            return this.modelData.get(key);
-        }
+        if (arguments.length === 0) {return this.modelData;}
+        if (this.isMap(this.modelData)) {return this.modelData.get(key);}
         if (Array.isArray(this.modelData)) {
             return Number.isInteger(key) ? this.modelData[key as number] : undefined;
         }
@@ -293,28 +267,18 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
                 return false;
             }
             const candidate = this.extend(raw, keyOrData);
-            if (!this.accepts(candidate)) {
-                return false;
-            }
-            if (!this.set(candidate, true)) {
-                return false;
-            }
-            if (dataOrSilent !== true) {
-                this.message(['change', 'update'], this.get());
-            }
+            if (!this.accepts(candidate)) {return false;}
+            if (!this.set(candidate, true)) {return false;}
+            if (dataOrSilent !== true) {this.dispatchMessages(['change', 'update'], this.get());}
             return true;
         }
 
-        if (arguments.length < 2) {
-            return false;
-        }
+        if (arguments.length < 2) {return false;}
         const isMapState = this.isMap(raw);
         const hasItem = isMapState
             ? raw.has(keyOrData)
             : Number.isInteger(keyOrData) && (keyOrData as number) >= 0 && (keyOrData as number) < (raw as unknown[]).length;
-        if (!hasItem) {
-            return false;
-        }
+        if (!hasItem) {return false;}
         const current = isMapState ? raw.get(keyOrData) : (raw as unknown[])[keyOrData as number];
         const nextValue = this.isPlainObject(current) && this.isPlainObject(dataOrSilent)
             ? this.extend(current, dataOrSilent)
@@ -326,18 +290,11 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
             } else {
                 (candidate as unknown[])[keyOrData as number] = nextValue;
             }
-            if (!this.accepts(candidate)) {
-                return false;
-            }
+            if (!this.accepts(candidate)) {return false;}
         }
-        if (isMapState) {
-            raw.set(keyOrData, nextValue);
-        } else {
-            (raw as unknown[])[keyOrData as number] = nextValue;
-        }
-        if (!silent) {
-            this.message(['change', 'update'], this.get());
-        }
+        if (isMapState) {raw.set(keyOrData, nextValue);}
+        else {(raw as unknown[])[keyOrData as number] = nextValue;}
+        if (!silent) {this.dispatchMessages(['change', 'update'], this.get());}
         return true;
     }
 
@@ -350,58 +307,34 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
             }
             const additions: unknown[] = [];
             if (Array.isArray(key)) {
-                for (let index = 0; index < key.length; index += 1) {
-                    additions.push(this.toRaw(key[index]));
-                }
-            } else {
-                additions.push(this.toRaw(key));
-            }
-            if (this.validator && !this.accepts(raw.concat(additions))) {
-                return false;
-            }
-            for (let index = 0; index < additions.length; index += 1) {
-                raw.push(additions[index]);
-            }
-            if (dataOrSilent !== true) {
-                this.message(['change', 'push'], this.get());
-            }
+                for (let index = 0; index < key.length; index += 1) {additions.push(this.toRaw(key[index]));}
+            } else {additions.push(this.toRaw(key));}
+            if (this.validator && !this.accepts(raw.concat(additions))) {return false;}
+            for (let index = 0; index < additions.length; index += 1) {raw.push(additions[index]);}
+            if (dataOrSilent !== true) {this.dispatchMessages(['change', 'push'], this.get());}
             return true;
         }
-        if (!this.isMap(raw)) {
-            return false;
-        }
+        if (!this.isMap(raw)) {return false;}
         if (this.isMap(key)) {
-            if (arguments.length > 2 || (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean')) {
-                return false;
-            }
+            if (arguments.length > 2 || (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean')) {return false;}
             if (this.validator) {
                 const candidate = new Map(raw);
                 key.forEach((value, mapKey) => candidate.set(mapKey, this.toRaw(value)));
-                if (!this.accepts(candidate)) {
-                    return false;
-                }
+                if (!this.accepts(candidate)) {return false;}
             }
             key.forEach((value, mapKey) => raw.set(mapKey, this.toRaw(value)));
-            if (dataOrSilent !== true) {
-                this.message(['change', 'push'], this.get());
-            }
+            if (dataOrSilent !== true) {this.dispatchMessages(['change', 'push'], this.get());}
             return true;
         }
-        if (arguments.length < 2) {
-            return false;
-        }
+        if (arguments.length < 2) {return false;}
         const rawValue = this.toRaw(dataOrSilent);
         if (this.validator) {
             const candidate = new Map(raw);
             candidate.set(key, rawValue);
-            if (!this.accepts(candidate)) {
-                return false;
-            }
+            if (!this.accepts(candidate)) {return false;}
         }
         raw.set(key, rawValue);
-        if (!silent) {
-            this.message(['change', 'push'], this.get());
-        }
+        if (!silent) {this.dispatchMessages(['change', 'push'], this.get());}
         return true;
     }
 
@@ -411,13 +344,9 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
         const isMapState = this.isMap(raw);
         const isArrayState = Array.isArray(raw);
         if (isMapState) {
-            if (!raw.has(key)) {
-                return false;
-            }
+            if (!raw.has(key)) {return false;}
         } else if (isArrayState) {
-            if (!Number.isInteger(key) || (key as number) < 0 || (key as number) >= raw.length) {
-                return false;
-            }
+            if (!Number.isInteger(key) || (key as number) < 0 || (key as number) >= raw.length) {return false;}
         } else if ((typeof key !== 'string' && typeof key !== 'symbol' && typeof key !== 'number') ||
             !Object.prototype.hasOwnProperty.call(raw, key)) {
             return false;
@@ -435,21 +364,13 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
                 candidate = this.extend(raw, null);
                 Reflect.deleteProperty(candidate, typeof key === 'number' ? String(key) : key as PropertyKey);
             }
-            if (!this.accepts(candidate)) {
-                return false;
-            }
+            if (!this.accepts(candidate)) {return false;}
         }
 
-        if (isMapState) {
-            raw.delete(key);
-        } else if (isArrayState) {
-            raw.splice(key as number, 1);
-        } else {
-            Reflect.deleteProperty(raw, typeof key === 'number' ? String(key) : key as PropertyKey);
-        }
-        if (!silent) {
-            this.message(['change', 'delete'], this.get());
-        }
+        if (isMapState) {raw.delete(key);}
+        else if (isArrayState) {raw.splice(key as number, 1);}
+        else {Reflect.deleteProperty(raw, typeof key === 'number' ? String(key) : key as PropertyKey);}
+        if (!silent) {this.dispatchMessages(['change', 'delete'], this.get());}
         return true;
     }
 
@@ -457,17 +378,11 @@ class Model<T extends ModelData = Record<string, unknown>> extends Utilities {
     clear(silent = false): boolean {
         const raw = this.rawState();
         const empty: ModelData = this.isMap(raw) ? new Map() : Array.isArray(raw) ? [] : {};
-        this.modelData = this.observe(empty, []) as T;
-        if (!silent) {
-            this.message(['change', 'clear'], this.get());
-        }
+        this.generation += 1;
+        this.modelData = this.observe(empty, [], this.generation) as T;
+        if (!silent) {this.dispatchMessages(['change', 'clear'], this.get());}
         return true;
     }
-
-    serviceGet() { return Promise.resolve({}); }
-    servicePatch() { return Promise.resolve({}); }
-    servicePost() { return Promise.resolve({}); }
-    servicePut() { return Promise.resolve({}); }
 }
 
 export = Model;
