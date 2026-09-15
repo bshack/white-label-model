@@ -137,6 +137,8 @@ Remove owned subscriptions with the same callback reference:
 model.removeListener('change', handleChange);
 ```
 
+These local Model events intentionally retain the EventEmitter-style API. The optional application-wide Mediator bridge described below uses the web-standard EventTarget contract instead.
+
 ## Deep observation
 
 Object, array, and Map branches are proxied lazily as they are accessed. Direct nested changes emit `change` plus a structured `mutate` event.
@@ -207,7 +209,7 @@ The legacy `serviceGet()`, `servicePatch()`, `servicePost()`, and `servicePut()`
 
 ## Mediator integration
 
-Model does not import or require a mediator. Assign any EventEmitter-compatible object plus a Model `name` to relay events as `model:<name>:<event>`.
+Model does not import or require `white-label-mediator`. Assign any EventTarget-compatible object plus a Model `name` to relay namespaced application events as `model:<name>:<event>`. The Model state or mutation payload is carried in `CustomEvent.detail`.
 
 ```js
 import Mediator from 'white-label-mediator';
@@ -219,14 +221,20 @@ const session = new Model({authenticated: false});
 session.name = 'session';
 session.mediator = mediator;
 
-mediator.on('model:session:update', state => {
-    console.log(state.authenticated);
+mediator.addEventListener('model:session:update', event => {
+    console.log(event.detail.authenticated);
 });
 
 session.update({authenticated: true});
 ```
 
-This is composition, not coupling: another compatible emitter—or no mediator at all—works equally well.
+This is composition, not coupling: another compatible EventTarget—or no mediator at all—works equally well.
+
+### Migrating from Model 6
+
+Model's local `on()`, `once()`, `emit()`, and `removeListener()` behavior is unchanged. Only the optional `model.mediator` bridge changes.
+
+If application code supplied an EventEmitter-compatible mediator, replace it with an EventTarget-compatible object. Namespaced relay subscribers now receive a `CustomEvent` and read the original payload from `event.detail` instead of receiving the payload as the callback's first argument.
 
 ## TypeScript
 
@@ -252,11 +260,11 @@ Keep persistence outside Model. Load data through the application-owned database
 
 Immutable configuration may live at module scope when useful. The important boundary is mutable application/request state, not whether code happens to execute in a function runtime.
 
-The package currently documents Node.js as its supported server runtime. The browser-compatible EventEmitter implementation is useful for portability, but it is not a blanket compatibility claim for every edge provider; verify the actual target runtime before deployment.
+The package currently documents Node.js as its supported server runtime. Its local browser-compatible EventEmitter implementation and standards-based optional mediator bridge are portability tools, not blanket compatibility claims for every edge provider; verify the actual target runtime before deployment.
 
 ## Event compatibility
 
-Tests exercise both Node's EventEmitter implementation and the npm browser implementation against the same event contract, and run Model without `window` or `document` globals. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
+Model's local event contract is regression-tested against both Node's EventEmitter implementation and the npm browser implementation. The optional mediator relay is separately tested through native EventTarget/CustomEvent semantics. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
 
 ## Development
 

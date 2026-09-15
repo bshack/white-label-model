@@ -1,6 +1,6 @@
 {
   "name": "white-label-model",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "description": "Lightweight observable TypeScript state management for browser, Node.js, and request-scoped serverless function applications.",
   "sideEffects": false,
   "main": "dist/index.js",

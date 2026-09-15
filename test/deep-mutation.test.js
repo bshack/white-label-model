@@ -1,7 +1,6 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const {EventEmitter} = require('node:events');
 const {describe, it, mock} = require('node:test');
 const {performance} = require('node:perf_hooks');
 
@@ -150,18 +149,20 @@ describe('Model deep mutation tracking', function() {
 
     it('relays deep changes through the mediator namespace', function() {
         const model = new Model({profile: {name: 'Ada'}});
-        const mediator = new EventEmitter();
+        const mediator = new EventTarget();
         const change = mock.fn();
         const mutate = mock.fn();
         model.name = 'profile';
         model.mediator = mediator;
-        mediator.on('model:profile:change', change);
-        mediator.on('model:profile:mutate', mutate);
+        mediator.addEventListener('model:profile:change', change);
+        mediator.addEventListener('model:profile:mutate', mutate);
 
         model.get().profile.name = 'Grace';
 
         assert.equal(change.mock.callCount(), 1);
         assert.equal(mutate.mock.callCount(), 1);
+        assert.equal(change.mock.calls[0].arguments[0].detail, model.get());
+        assert.equal(mutate.mock.calls[0].arguments[0].detail.state, model.get());
     });
 
     it('tracks very deep paths without an artificial depth limit', function() {

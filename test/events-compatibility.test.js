@@ -69,27 +69,25 @@ for (const [name, Backend] of backends) {
         }
     });
 
-    for (const [relayName, Relay] of backends) {
-        it(`${name} state relays to ${relayName} through the single model namespace`, () => {
-            for (const data of [{name: 'Ada'}, ['Ada'], new Map([['name', 'Ada']])]) {
-                const instance = new Model();
-                const mediator = new Relay();
-                const calls = [];
-                instance.name = 'profile';
-                instance.mediator = mediator;
-                for (const event of ['change', 'set']) {
-                    instance.on(event, value => {
-                        assert.equal(value, instance.get());
-                        calls.push(`local:${event}`);
-                    });
-                    mediator.on(`model:profile:${event}`, value => {
-                        assert.equal(value, instance.get());
-                        calls.push(`relay:${event}`);
-                    });
-                }
-                assert.equal(instance.set(data), true);
-                assert.deepEqual(calls, ['local:change', 'relay:change', 'local:set', 'relay:set']);
+    it(`Model / ${name}: state relays through a standards-based mediator namespace`, () => {
+        for (const data of [{name: 'Ada'}, ['Ada'], new Map([['name', 'Ada']])]) {
+            const instance = new Model();
+            const mediator = new EventTarget();
+            const calls = [];
+            instance.name = 'profile';
+            instance.mediator = mediator;
+            for (const event of ['change', 'set']) {
+                instance.on(event, value => {
+                    assert.equal(value, instance.get());
+                    calls.push(`local:${event}`);
+                });
+                mediator.addEventListener(`model:profile:${event}`, received => {
+                    assert.equal(received.detail, instance.get());
+                    calls.push(`relay:${event}`);
+                });
             }
-        });
-    }
+            assert.equal(instance.set(data), true);
+            assert.deepEqual(calls, ['local:change', 'relay:change', 'local:set', 'relay:set']);
+        }
+    });
 }

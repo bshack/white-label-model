@@ -1,6 +1,9 @@
 /** @module src/utilities */
 import EventEmitter from 'events';
 
+interface ApplicationMediator {
+    dispatchEvent(event: Event): boolean;
+}
 
 
 
@@ -12,7 +15,7 @@ UTILITIES
 class Utilities extends EventEmitter {
     label = '';
     name: string | false = false;
-    mediator: Pick<EventEmitter, 'emit'> | false = false;
+    mediator: ApplicationMediator | false = false;
 
     /**
      * Create an instance with its own state and listener references.
@@ -109,7 +112,7 @@ class Utilities extends EventEmitter {
     }
 
     /**
-     * Emit each local event and, when configured, a namespaced mediator event for truthy data.
+     * Emit each local event and, when configured, dispatch a namespaced application event for truthy data.
      * @param messages - Event names to emit in order.
      * @param data - Data supplied by the caller; validation follows the method contract.
      * @returns False for falsey data; true after emitting the requested events.
@@ -120,8 +123,11 @@ class Utilities extends EventEmitter {
 
             for (const message of messages) {
                 this.emit(message, data);
-                if (this.name && this.mediator && this.mediator.emit) {
-                    this.mediator.emit(this.label + ':' + this.name + ':' + message, data);
+                if (this.name && this.mediator) {
+                    this.mediator.dispatchEvent(new CustomEvent(
+                        this.label + ':' + this.name + ':' + message,
+                        {detail: data}
+                    ));
                 }
             }
 
