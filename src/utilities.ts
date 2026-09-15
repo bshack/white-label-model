@@ -39,6 +39,12 @@ class Utilities extends EventTarget {
         this.#listenerController = new AbortController();
     }
 
+    /** Internal lifecycle hook retained for Model.destroy(). */
+    protected removeAllListeners(): this {
+        this.resetEventListeners();
+        return this;
+    }
+
     /** Recognize native Map objects, including Maps created in another realm. */
     isMap(object: unknown): object is Map<unknown, unknown> {
         return Object.prototype.toString.call(object) === '[object Map]';
