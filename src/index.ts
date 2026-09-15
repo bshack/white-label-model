@@ -2,7 +2,7 @@
 import ModelImplementation = require('./model');
 
 type ModelData = Record<PropertyKey, unknown> | unknown[] | Map<unknown, unknown>;
-type ModelEventMethod = 'on' | 'once' | 'addListener' | 'off' | 'removeListener' | 'emit';
+type ModelEventMethod = 'addEventListener' | 'removeEventListener';
 
 interface ModelMutation<T extends ModelData> {
     operation: 'set' | 'delete' | 'clear';
@@ -13,43 +13,30 @@ interface ModelMutation<T extends ModelData> {
 }
 
 interface ModelEvents<T extends ModelData> {
-    change: [state: T];
-    mutate: [mutation: ModelMutation<T>];
-    set: [state: T];
-    update: [state: T];
-    push: [state: T];
-    delete: [state: T];
-    clear: [state: T];
+    change: T;
+    mutate: ModelMutation<T>;
+    set: T;
+    update: T;
+    push: T;
+    delete: T;
+    clear: T;
 }
 
 type ModelEventName<T extends ModelData> = keyof ModelEvents<T>;
-type ModelEventArguments<T extends ModelData, Name extends ModelEventName<T>> = ModelEvents<T>[Name];
+type ModelEventListener<T extends ModelData, Name extends ModelEventName<T>> =
+    ((event: CustomEvent<ModelEvents<T>[Name]>) => void) | EventListenerObject | null;
 
 type Model<T extends ModelData = Record<string, unknown>> = Omit<ModelImplementation<T>, ModelEventMethod> & {
-    on<Name extends ModelEventName<T>>(
-        eventName: Name,
-        listener: (...arguments_: ModelEventArguments<T, Name>) => void
-    ): Model<T>;
-    once<Name extends ModelEventName<T>>(
-        eventName: Name,
-        listener: (...arguments_: ModelEventArguments<T, Name>) => void
-    ): Model<T>;
-    addListener<Name extends ModelEventName<T>>(
-        eventName: Name,
-        listener: (...arguments_: ModelEventArguments<T, Name>) => void
-    ): Model<T>;
-    off<Name extends ModelEventName<T>>(
-        eventName: Name,
-        listener: (...arguments_: ModelEventArguments<T, Name>) => void
-    ): Model<T>;
-    removeListener<Name extends ModelEventName<T>>(
-        eventName: Name,
-        listener: (...arguments_: ModelEventArguments<T, Name>) => void
-    ): Model<T>;
-    emit<Name extends ModelEventName<T>>(
-        eventName: Name,
-        ...arguments_: ModelEventArguments<T, Name>
-    ): boolean;
+    addEventListener<Name extends ModelEventName<T>>(
+        type: Name,
+        callback: ModelEventListener<T, Name>,
+        options?: boolean | AddEventListenerOptions
+    ): void;
+    removeEventListener<Name extends ModelEventName<T>>(
+        type: Name,
+        callback: ModelEventListener<T, Name>,
+        options?: boolean | EventListenerOptions
+    ): void;
 };
 
 interface ModelConstructor {

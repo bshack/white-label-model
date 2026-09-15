@@ -35,7 +35,6 @@
   "license": "MIT",
   "bugs": {"url": "https://github.com/bshack/white-label-model/issues"},
   "homepage": "https://whitelabeljs.org/docs/model/",
-  "dependencies": {"events": "3.3.0"},
   "devDependencies": {
     "@babel/core": "8.0.5",
     "@babel/eslint-parser": "8.0.5",

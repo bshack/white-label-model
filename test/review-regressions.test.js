@@ -6,7 +6,7 @@ const {Model} = require('../dist');
 test('clear and destroy empty state even when validation requires fields', () => {
     const model = new Model({token: 'synthetic'}, data => typeof data.token === 'string');
     const changes = [];
-    model.on('change', data => changes.push(data));
+    model.addEventListener('change', event => changes.push(event.detail));
     assert.equal(model.clear(), true);
     assert.deepEqual(model.get(), {});
     assert.equal(changes.length, 1);
@@ -14,14 +14,15 @@ test('clear and destroy empty state even when validation requires fields', () =>
     model.destroy();
     assert.deepEqual(model.get(), {});
     assert.equal(changes.length, 1);
-    assert.deepEqual(model.eventNames(), []);
+    model.dispatchEvent(new CustomEvent('change', {detail: model.get()}));
+    assert.equal(changes.length, 1);
 });
 
 test('large, sparse and self appends preserve array identity and one notification', () => {
     const model = new Model([1]);
     const backing = model.get();
     let changes = 0;
-    model.on('change', () => changes++);
+    model.addEventListener('change', () => changes++);
     model.push(new Array(250000).fill(2));
     assert.equal(model.get(), backing);
     assert.equal(backing.length, 250001);

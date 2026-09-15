@@ -32,7 +32,7 @@ describe('Model valid edge cases', () => {
         state.self = state;
         const model = new Model(state);
         const mutate = mock.fn();
-        model.on('mutate', mutate);
+        model.addEventListener('mutate', event => mutate(event.detail));
 
         model.get().self.name = 'updated';
 
@@ -54,7 +54,7 @@ describe('Model valid edge cases', () => {
     it('handles special primitive values using Object.is semantics', () => {
         const model = new Model({nan: NaN, zero: -0, big: 1n, symbol: Symbol.for('state'), missing: undefined});
         const mutate = mock.fn();
-        model.on('mutate', mutate);
+        model.addEventListener('mutate', event => mutate(event.detail));
 
         model.get().nan = NaN;
         assert.equal(mutate.mock.callCount(), 0);
@@ -74,7 +74,7 @@ describe('Model valid edge cases', () => {
         const regex = /model/gi;
         const model = new Model({date, set, regex});
         const mutate = mock.fn();
-        model.on('mutate', mutate);
+        model.addEventListener('mutate', event => mutate(event.detail));
 
         assert.equal(model.get().date, date);
         assert.equal(model.get().set, set);
@@ -99,7 +99,7 @@ describe('Model valid edge cases', () => {
             [NaN, {value: 3}]
         ]));
         const mutate = mock.fn();
-        model.on('mutate', mutate);
+        model.addEventListener('mutate', event => mutate(event.detail));
 
         model.get().get(objectKey).value = 4;
         model.get().get(symbolKey).value = 5;
@@ -114,7 +114,7 @@ describe('Model valid edge cases', () => {
     it('rejects direct writes to a frozen root without emitting mutation events', () => {
         const model = new Model(Object.freeze({value: 1}));
         const mutate = mock.fn();
-        model.on('mutate', mutate);
+        model.addEventListener('mutate', event => mutate(event.detail));
 
         assert.throws(() => {
             model.get().value = 2;

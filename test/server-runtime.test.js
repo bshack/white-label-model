@@ -18,7 +18,7 @@ test('model keeps the same observable contract in plain Node without browser glo
     withoutBrowserGlobals(t);
     const model = new Model({user: {name: 'Ada'}, tags: ['math']});
     const changes = [];
-    model.on('change', state => changes.push(state.user.name));
+    model.addEventListener('change', event => changes.push(event.detail.user.name));
 
     assert.equal(model.update({user: {name: 'Grace'}}), true);
     assert.equal(model.get().user.name, 'Grace');

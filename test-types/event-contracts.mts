@@ -5,21 +5,22 @@ const model = new Model<{name: string; nested: {active: boolean}}>({
     nested: {active: true}
 });
 
-model.on('change', state => state.name.toUpperCase());
-model.once('set', state => state.nested.active);
-model.addListener('update', state => state.name);
-model.off('update', state => state.name);
-model.removeListener('change', state => state.name);
-model.on('mutate', mutation => {
-    mutation.operation;
-    mutation.path;
-    mutation.state.name;
-});
-model.emit('change', model.get());
+const updateListener = (event: CustomEvent<{name: string; nested: {active: boolean}}>) => event.detail.name;
 
-// @ts-expect-error unknown model event names are rejected.
-model.on('missing', () => {});
-// @ts-expect-error change payloads must match the model state type.
-model.emit('change', {name: 'Ada'});
-// @ts-expect-error mutate payloads must use the mutation contract.
-model.emit('mutate', 'invalid');
+model.addEventListener('change', event => event.detail.name.toUpperCase());
+model.addEventListener('set', event => event.detail.nested.active, {once: true});
+model.addEventListener('update', updateListener);
+model.removeEventListener('update', updateListener);
+model.addEventListener('mutate', event => {
+    event.detail.operation;
+    event.detail.path;
+    event.detail.state.name;
+});
+model.dispatchEvent(new CustomEvent('change', {detail: model.get()}));
+
+// @ts-expect-error unknown model event names are rejected for typed listeners.
+model.addEventListener('missing', () => {});
+// @ts-expect-error change listeners receive the complete model state in CustomEvent.detail.
+model.addEventListener('change', (_event: CustomEvent<{wrong: number}>) => {});
+// @ts-expect-error mutate listeners receive the mutation detail contract.
+model.addEventListener('mutate', (_event: CustomEvent<string>) => {});

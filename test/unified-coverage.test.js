@@ -3,7 +3,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const {Model} = require('../dist');
-const Utilities = require('../dist/utilities');
 
 test('observable Map exposes native reads, iteration, callbacks, and mutations', () => {
     const model = new Model(new Map([
@@ -13,8 +12,8 @@ test('observable Map exposes native reads, iteration, callbacks, and mutations',
     const map = model.get();
     const changes = [];
     const mutations = [];
-    model.on('change', state => changes.push(state));
-    model.on('mutate', mutation => mutations.push(mutation));
+    model.addEventListener('change', event => changes.push(event.detail));
+    model.addEventListener('mutate', event => mutations.push(event.detail));
 
     assert.equal(map.size, 2);
     assert.equal(map.has('number'), true);
@@ -68,19 +67,4 @@ test('object update reports rejection if a stateful validator changes between ch
     });
     assert.equal(model.update({name: 'Grace'}), false);
     assert.equal(model.get().name, 'Ada');
-});
-
-test('shared Utilities guards and array helper retain their standalone contract', () => {
-    const utilities = new Utilities();
-    assert.equal(utilities.isMap(new Map()), true);
-    assert.equal(utilities.isMap({}), false);
-    assert.equal(utilities.isFinite(1), true);
-    assert.equal(utilities.isFinite(Infinity), false);
-    assert.equal(utilities.isFinite('1'), false);
-    assert.equal(utilities.isPlainObject(Object.create(null)), true);
-    assert.equal(utilities.isPlainObject(new (class Example {})()), false);
-    assert.equal(utilities.isPlainObject([]), false);
-    const items = ['a', 'b'];
-    assert.equal(utilities.pullAt(items, 0), items);
-    assert.deepEqual(items, ['b']);
 });

@@ -1,20 +1,60 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const {it} = require('node:test');
-const {backends, loadPackage} = require('./helpers/events-backend');
-const eventsContract = require('./helpers/events-contract');
+const {describe, it} = require('node:test');
+const {Model} = require('../dist');
 
-for (const [name, Backend] of backends) {
-    const {Model} = loadPackage(Backend);
-    eventsContract(`Model / ${name}`, () => new Model(), Backend);
+describe('Model EventTarget contract', () => {
+    it('is a standards-based EventTarget with lifecycle chaining', () => {
+        const model = new Model();
+        assert.ok(model instanceof EventTarget);
+        assert.equal(model.initialize(), model);
+        assert.equal(model.destroy(), model);
 
-    it(`Model / ${name}: object events preserve payload identity, order, silence, and validation`, () => {
+        let calls = 0;
+        model.addEventListener('reused', () => calls++);
+        model.dispatchEvent(new CustomEvent('reused'));
+        assert.equal(calls, 1);
+    });
+
+    it('accepts native boolean and null listener options', () => {
+        const model = new Model();
+        const calls = [];
+        const captured = event => calls.push(['capture', event.detail]);
+        const defaulted = event => calls.push(['default', event.detail]);
+
+        model.addEventListener('options', captured, true);
+        model.addEventListener('options', defaulted, null);
+        model.dispatchEvent(new CustomEvent('options', {detail: 1}));
+        model.removeEventListener('options', captured, true);
+        model.removeEventListener('options', defaulted);
+        model.dispatchEvent(new CustomEvent('options', {detail: 2}));
+
+        assert.deepEqual(calls, [['capture', 1], ['default', 1]]);
+    });
+
+    it('supports native once, caller AbortSignal cleanup, and cancellation semantics', () => {
+        const model = new Model();
+        const calls = [];
+        const controller = new AbortController();
+
+        model.addEventListener('data', event => calls.push(['once', event.detail]), {once: true});
+        model.addEventListener('data', event => calls.push(['signal', event.detail]), {signal: controller.signal});
+        assert.equal(model.dispatchEvent(new CustomEvent('data', {detail: 1})), true);
+        controller.abort();
+        assert.equal(model.dispatchEvent(new CustomEvent('data', {detail: 2})), true);
+        assert.deepEqual(calls, [['once', 1], ['signal', 1]]);
+
+        model.addEventListener('cancel', event => event.preventDefault());
+        assert.equal(model.dispatchEvent(new CustomEvent('cancel', {cancelable: true})), false);
+    });
+
+    it('object events preserve detail identity, order, silence, and validation', () => {
         const model = new Model({name: 'Ada'}, value => typeof value.name === 'string');
         const calls = [];
         for (const event of ['change', 'set', 'update', 'delete', 'clear']) {
-            model.on(event, value => {
-                assert.equal(value, model.get());
+            model.addEventListener(event, received => {
+                assert.equal(received.detail, model.get());
                 calls.push(event);
             });
         }
@@ -34,12 +74,12 @@ for (const [name, Backend] of backends) {
         ['array', [], 0],
         ['Map', new Map(), 'item']
     ]) {
-        it(`Model ${label} / ${name}: collection operations use the same event contract`, () => {
+        it(`Model ${label}: collection operations use the same event contract`, () => {
             const model = new Model(data);
             const calls = [];
             for (const event of ['change', 'set', 'push', 'update', 'delete', 'clear']) {
-                model.on(event, value => {
-                    assert.equal(value, model.get());
+                model.addEventListener(event, received => {
+                    assert.equal(received.detail, model.get());
                     calls.push(event);
                 });
             }
@@ -54,22 +94,22 @@ for (const [name, Backend] of backends) {
         });
     }
 
-    it(`Model / ${name}: destroy clears every supported root shape silently`, () => {
+    it('destroy clears every supported root shape and owned listener silently', () => {
         for (const instance of [new Model({name: 'Ada'}), new Model(['Ada']), new Model(new Map([['Ada', true]]))]) {
             const calls = [];
-            instance.on('change', () => calls.push('change'));
-            instance.on('clear', () => calls.push('clear'));
-            instance.on(Symbol('custom'), () => calls.push('custom'));
+            instance.addEventListener('change', () => calls.push('change'));
+            instance.addEventListener('clear', () => calls.push('clear'));
+            instance.addEventListener('custom', () => calls.push('custom'));
             assert.equal(instance.initialize(), instance);
             assert.equal(instance.destroy(), instance);
-            assert.deepEqual(instance.eventNames(), []);
+            instance.dispatchEvent(new CustomEvent('custom'));
             assert.deepEqual(calls, []);
             const state = instance.get();
             assert.equal(state instanceof Map ? state.size : Object.keys(state).length, 0);
         }
     });
 
-    it(`Model / ${name}: state relays through a standards-based mediator namespace`, () => {
+    it('state relays through the mediator namespace after each local event', () => {
         for (const data of [{name: 'Ada'}, ['Ada'], new Map([['name', 'Ada']])]) {
             const instance = new Model();
             const mediator = new EventTarget();
@@ -77,8 +117,8 @@ for (const [name, Backend] of backends) {
             instance.name = 'profile';
             instance.mediator = mediator;
             for (const event of ['change', 'set']) {
-                instance.on(event, value => {
-                    assert.equal(value, instance.get());
+                instance.addEventListener(event, received => {
+                    assert.equal(received.detail, instance.get());
                     calls.push(`local:${event}`);
                 });
                 mediator.addEventListener(`model:profile:${event}`, received => {
@@ -90,4 +130,4 @@ for (const [name, Backend] of backends) {
             assert.deepEqual(calls, ['local:change', 'relay:change', 'local:set', 'relay:set']);
         }
     });
-}
+});

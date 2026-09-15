@@ -25,6 +25,7 @@ The package has no runtime dependency on the other White Label packages.
 
 - Node.js `^22.18.0` or `>=24.11.0`
 - npm, Yarn, and pnpm are supported for installation; see [`PACKAGE_MANAGERS.md`](PACKAGE_MANAGERS.md)
+- Native `EventTarget`, `CustomEvent`, `AbortController`, and `AbortSignal.any()` support
 - Native `Proxy` support for deep observation
 - Native `Map` support when using `Map` state
 
@@ -54,9 +55,8 @@ const profile = new Model({
     preferences: {theme: 'light'}
 });
 
-// `change` receives the complete current state after an accepted mutation.
-profile.on('change', state => {
-    console.log(state);
+profile.addEventListener('change', event => {
+    console.log(event.detail);
 });
 
 profile.update({name: 'Grace'});
@@ -104,6 +104,9 @@ people.update('ada', {name: 'Ada Lovelace'});
 | Method | Behavior | Returns |
 | --- | --- | --- |
 | `initialize()` | Start the instance for lifecycle chaining. | The same `Model` instance. |
+| `addEventListener(type, callback, options?)` | Subscribe with native EventTarget listener semantics; Model payloads are in `CustomEvent.detail`. | `undefined`. |
+| `removeEventListener(type, callback, options?)` | Remove a previously registered listener using native EventTarget matching rules. | `undefined`. |
+| `dispatchEvent(event)` | Dispatch an application-supplied `Event` or `CustomEvent`. | Native EventTarget cancellation result. |
 | `get()` | Return the complete current state. | The observable object, array, or `Map` root. |
 | `get(key)` | Read an object property, array index, or Map value. | The matching value, or `undefined` when the key/index does not resolve. |
 | `set(data, silent?)` | Replace the root with any supported shape. | `true` when accepted; `false` for unsupported or validator-rejected data. |
@@ -111,44 +114,57 @@ people.update('ada', {name: 'Ada Lovelace'});
 | `push(...)` | Append array values or add Map entries. | `true` when accepted; `false` for an invalid call, object state, or validator rejection. |
 | `delete(key, silent?)` | Delete one object property, array index, or Map entry. | `true` when removed; `false` when the member does not exist or validation rejects the result. |
 | `clear(silent?)` | Reset to an empty value of the current root shape. | Always `true`. |
-| `destroy()` | Clear silently and release listeners. | The same `Model` instance after cleanup. |
+| `destroy()` | Clear silently and release listeners. | The same reusable `Model` instance after cleanup. |
 
-Passing `true` as the final `silent` argument suppresses events. Mutation methods are synchronous: their return value is available only after validation and the accepted state change have completed.
+Passing `true` as the final `silent` argument suppresses Model-generated events. Mutation methods are synchronous: their return value is available only after validation and the accepted state change have completed.
 
 `update()` shallow-merges plain objects and blocks `__proto__`, `constructor`, and `prototype` from merge input. It does not recursively merge nested objects.
 
 ## Events
 
-Successful non-silent explicit mutations emit `change` followed by their operation event: `set`, `update`, `push`, `delete`, or `clear`.
+Successful non-silent explicit mutations dispatch `change` followed by their operation event: `set`, `update`, `push`, `delete`, or `clear`. Payloads are carried in `CustomEvent.detail`, matching `white-label-mediator`.
 
 ```js
-model.on('change', state => {
+model.addEventListener('change', event => {
+    const state = event.detail;
     // `state` is the complete current state.
 });
 
-model.on('update', state => {
+model.addEventListener('update', event => {
+    const state = event.detail;
     // `state` is the complete current state after update().
 });
 ```
 
-Remove owned subscriptions with the same callback reference:
+Use standard EventTarget options for one-time and abortable subscriptions:
 
 ```js
-model.removeListener('change', handleChange);
+model.addEventListener('change', handleFirstChange, {once: true});
+
+const controller = new AbortController();
+model.addEventListener('change', handleChange, {signal: controller.signal});
+controller.abort();
 ```
 
-These local Model events intentionally retain the EventEmitter-style API. The optional application-wide Mediator bridge described below uses the web-standard EventTarget contract instead.
+Remove subscriptions with the same callback reference and capture mode:
+
+```js
+model.removeEventListener('change', handleChange);
+```
+
+`destroy()` aborts the Model-owned listener lifecycle and leaves the instance reusable. Caller-provided abort signals remain effective because Model combines them with its lifecycle signal.
 
 ## Deep observation
 
-Object, array, and Map branches are proxied lazily as they are accessed. Direct nested changes emit `change` plus a structured `mutate` event.
+Object, array, and Map branches are proxied lazily as they are accessed. Direct nested changes dispatch `change` plus a structured `mutate` event.
 
 ```js
 const model = new Model({
     user: {preferences: {theme: 'light'}}
 });
 
-model.on('mutate', mutation => {
+model.addEventListener('mutate', event => {
+    const mutation = event.detail;
     console.log(mutation.operation); // => 'set'
     console.log(mutation.path);      // => ['user', 'preferences', 'theme']
 });
@@ -156,7 +172,7 @@ model.on('mutate', mutation => {
 model.get().user.preferences.theme = 'dark';
 ```
 
-The `mutate` payload is:
+The `mutate` detail is:
 
 ```js
 {
@@ -169,6 +185,8 @@ The `mutate` payload is:
 ```
 
 Observation is path-based: accessing a branch creates proxies for that branch, and a direct mutation does not deep-diff unrelated state. Direct object deletion and direct `Map#set()`, `Map#delete()`, and `Map#clear()` operations are observed. Assigning the same value is ignored.
+
+When `set()`, `clear()`, or `destroy()` replaces the root, previously retained proxies still refer to their old JavaScript objects but are detached from the Model lifecycle. Mutating those detached proxies does not dispatch Model events or change the current root.
 
 Direct writes to `__proto__`, `constructor`, and `prototype` are rejected.
 
@@ -198,18 +216,18 @@ TypeScript and the validator solve different problems: TypeScript checks code at
 
 ## Async work stays outside state mutation
 
-Model does not turn state operations into asynchronous workflows. Resolve I/O first, then apply the result synchronously:
+Model does not own networking or turn state operations into asynchronous workflows. Resolve I/O in application-owned code, validate external data at that boundary when needed, then apply the result synchronously:
 
 ```js
 const data = await fetchData();
 model.set(data);
 ```
 
-The legacy `serviceGet()`, `servicePatch()`, `servicePost()`, and `servicePut()` methods remain no-I/O compatibility placeholders and resolve `{}`. New application networking should stay in application-owned services rather than extending Model's responsibility.
+Networking and persistence remain application-owned concerns, which keeps Model's state contract consistent in browser, server, test, and request-scoped code.
 
 ## Mediator integration
 
-Model does not import or require `white-label-mediator`. Assign any EventTarget-compatible object plus a Model `name` to relay namespaced application events as `model:<name>:<event>`. The Model state or mutation payload is carried in `CustomEvent.detail`.
+Model does not import or require `white-label-mediator`. Assign any EventTarget-compatible object plus a Model `name` to relay namespaced application events as `model:<name>:<event>`. The Model state or mutation payload is carried in `CustomEvent.detail` at both the local and mediator boundaries.
 
 ```js
 import Mediator from 'white-label-mediator';
@@ -221,6 +239,10 @@ const session = new Model({authenticated: false});
 session.name = 'session';
 session.mediator = mediator;
 
+session.addEventListener('update', event => {
+    console.log(event.detail.authenticated);
+});
+
 mediator.addEventListener('model:session:update', event => {
     console.log(event.detail.authenticated);
 });
@@ -230,21 +252,21 @@ session.update({authenticated: true});
 
 This is composition, not coupling: another compatible EventTarget—or no mediator at all—works equally well.
 
-### Migrating from Model 6
-
-Model's local `on()`, `once()`, `emit()`, and `removeListener()` behavior is unchanged. Only the optional `model.mediator` bridge changes.
-
-If application code supplied an EventEmitter-compatible mediator, replace it with an EventTarget-compatible object. Namespaced relay subscribers now receive a `CustomEvent` and read the original payload from `event.detail` instead of receiving the payload as the callback's first argument.
-
 ## TypeScript
 
-`Model<T>` describes the supported root state:
+`Model<T>` describes the supported root state and provides typed Model event listeners:
 
 ```ts
 const profile = new Model<{name: string}>({name: 'Ada'});
+profile.addEventListener('change', event => {
+    event.detail.name.toUpperCase();
+});
+
 const tasks = new Model<Array<{id: number; complete: boolean}>>([]);
 const people = new Model<Map<string, {name: string}>>(new Map());
 ```
+
+The event-name map constrains `addEventListener()` and `removeEventListener()` callbacks. `dispatchEvent()` remains the native EventTarget method and is not runtime payload validation.
 
 TypeScript describes expected values to the compiler but does not validate data arriving at runtime. Add the optional validator only when that runtime boundary needs an acceptance check.
 
@@ -260,11 +282,11 @@ Keep persistence outside Model. Load data through the application-owned database
 
 Immutable configuration may live at module scope when useful. The important boundary is mutable application/request state, not whether code happens to execute in a function runtime.
 
-The package currently documents Node.js as its supported server runtime. Its local browser-compatible EventEmitter implementation and standards-based optional mediator bridge are portability tools, not blanket compatibility claims for every edge provider; verify the actual target runtime before deployment.
+The package currently documents Node.js as its supported server runtime. Its standards-based EventTarget/CustomEvent event boundary is portable to modern browser runtimes, but verify the actual target runtime before deployment.
 
-## Event compatibility
+## Event contract
 
-Model's local event contract is regression-tested against both Node's EventEmitter implementation and the npm browser implementation. The optional mediator relay is separately tested through native EventTarget/CustomEvent semantics. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
+Model's local event contract and optional mediator relay use the same EventTarget/CustomEvent semantics. The regression suite covers native listener options, cancellation return semantics, synchronous event ordering, payload identity, destroy cleanup, reuse after destroy, object/array/Map state, deep mutation detail, detached-root behavior, and browser-facing behavior. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
 
 ## Development
 
@@ -278,7 +300,7 @@ npm run audit
 npm pack --dry-run
 ```
 
-Coverage enforces 100% statements, branches, functions, and lines per implementation file. CI builds authored source, uploads generated package artifacts for inspection, audits dependencies, packs the package, and verifies the packed public API across npm, Yarn, and pnpm.
+Coverage enforces 100% statements, branches, functions, and lines per implementation file. CI tests both Node 24 and the advertised Node 22.18 minimum, builds authored source, audits dependencies, packs the package, and verifies the packed public API across npm, Yarn, and pnpm. The release workflow verifies the tag against the current default-branch commit and publishes only the verified package artifact through npm trusted publishing.
 
 Implementation lives in `src/`; generated JavaScript, source maps, and declarations live in `dist/`. Edit TypeScript sources and regenerate `dist` rather than hand-editing generated output.
 
