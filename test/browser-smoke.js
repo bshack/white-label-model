@@ -2,38 +2,45 @@
 const {Model} = require('..');
 const instances = [new Model(), new Model([]), new Model(new Map())];
 const assert = (value, message) => { if (!value) throw new Error(message); };
-for (const emitter of instances) {
+
+for (const model of instances) {
+    assert(model instanceof EventTarget, 'Model is an EventTarget');
+
     const calls = [];
-    const listener = function (value) { assert(this === emitter, 'listener receiver'); calls.push(value); };
-    emitter.on('data', listener).on('data', listener);
-    emitter.removeListener('data', listener);
-    emitter.emit('data', 42);
-    assert(calls.length === 1 && calls[0] === 42, 'duplicate removal and payload');
-    emitter.prependOnceListener('data', () => calls.push('first'));
-    emitter.emit('data', 43);
-    assert(calls[1] === 'first' && calls[2] === 43, 'prepend once');
+    const listener = function (event) {
+        assert(this === model, 'listener receiver');
+        calls.push(event.detail);
+    };
+    model.addEventListener('data', listener);
+    model.addEventListener('data', listener);
+    model.dispatchEvent(new CustomEvent('data', {detail: 42}));
+    assert(calls.length === 1 && calls[0] === 42, 'native duplicate registration and payload');
+    model.removeEventListener('data', listener);
+    model.dispatchEvent(new CustomEvent('data', {detail: 43}));
+    assert(calls.length === 1, 'listener removal');
+
     let once = 0;
-    emitter.once('recursive', () => { once++; emitter.emit('recursive'); });
-    emitter.emit('recursive');
+    model.addEventListener('recursive', () => {
+        once++;
+        model.dispatchEvent(new CustomEvent('recursive'));
+    }, {once: true});
+    model.dispatchEvent(new CustomEvent('recursive'));
     assert(once === 1, 'recursive once');
-    emitter.once('answer', value => value);
-    const raw = emitter.rawListeners('answer')[0];
-    assert(raw(42) === 42 && raw(99) === undefined, 'raw once return and one-time invocation');
-    emitter.on('keep', listener);
-    emitter.removeAllListeners(undefined);
-    assert(emitter.listenerCount('keep') === 1, 'explicit undefined preserves unrelated events');
-    const symbol = Symbol('observed cleanup');
-    let removed = false;
-    emitter.on('removeListener', event => { if (event === symbol) removed = true; });
-    emitter.on(symbol, listener);
-    emitter.removeAllListeners(symbol);
-    assert(removed, 'explicit symbol cleanup notification');
-    const error = new Error('expected');
-    let caught;
-    try { emitter.emit('error', error); } catch (value) { caught = value; }
-    assert(caught === error, 'unhandled errors');
-    emitter.on(Symbol('cleanup'), listener);
-    emitter.destroy();
-    assert(emitter.eventNames().length === 0, 'cleanup');
+
+    const controller = new AbortController();
+    model.addEventListener('abortable', listener, {signal: controller.signal});
+    controller.abort();
+    model.dispatchEvent(new CustomEvent('abortable', {detail: 44}));
+    assert(calls.length === 1, 'abort signal cleanup');
+
+    model.addEventListener('cleanup', listener);
+    model.destroy();
+    model.dispatchEvent(new CustomEvent('cleanup', {detail: 45}));
+    assert(calls.length === 1, 'destroy cleanup');
+
+    model.addEventListener('reused', listener);
+    model.dispatchEvent(new CustomEvent('reused', {detail: 46}));
+    assert(calls.at(-1) === 46, 'reuse after destroy');
 }
+
 globalThis.whiteLabelSmokePassed = true;
