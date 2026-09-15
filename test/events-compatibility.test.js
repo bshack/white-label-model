@@ -17,6 +17,22 @@ describe('Model EventTarget contract', () => {
         assert.equal(calls, 1);
     });
 
+    it('accepts native boolean and null listener options', () => {
+        const model = new Model();
+        const calls = [];
+        const captured = event => calls.push(['capture', event.detail]);
+        const defaulted = event => calls.push(['default', event.detail]);
+
+        model.addEventListener('options', captured, true);
+        model.addEventListener('options', defaulted, null);
+        model.dispatchEvent(new CustomEvent('options', {detail: 1}));
+        model.removeEventListener('options', captured, true);
+        model.removeEventListener('options', defaulted);
+        model.dispatchEvent(new CustomEvent('options', {detail: 2}));
+
+        assert.deepEqual(calls, [['capture', 1], ['default', 1]]);
+    });
+
     it('supports native once, caller AbortSignal cleanup, and cancellation semantics', () => {
         const model = new Model();
         const calls = [];
