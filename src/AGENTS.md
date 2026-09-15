@@ -5,8 +5,7 @@ These instructions are more specific than the repository-root agent guide for fi
 ## Model 7 public contract
 
 - `Model` directly extends native `EventTarget`. Local Model events and optional mediator relays use `EventTarget`, `CustomEvent`, and `CustomEvent.detail`.
-- Do not reintroduce EventEmitter-style `on`, `once`, `emit`, `off`, `removeListener`, listener-inspection helpers, or EventEmitter compatibility adapters.
-- Do not reintroduce `serviceGet`, `servicePatch`, `servicePost`, `servicePut`, a Collection alias, or inherited compatibility utilities such as `isFinite`, `pullAt`, `extend`, or `message` as public Model methods.
+- The public Model surface is the documented state API plus native EventTarget listener methods; keep internal helpers private.
 - Model owns observable state only. Networking, persistence, rendering, routing, and application-wide orchestration remain outside the package.
 - Preserve synchronous mutation return values, `silent` semantics, event order, object/array/Map behavior, and whole-state `CustomEvent.detail` payload identity.
 - Deep observation must remain lazy and path-based. Do not add whole-tree scans or diffs for ordinary nested mutations.
@@ -16,4 +15,4 @@ These instructions are more specific than the repository-root agent guide for fi
 
 ## Verification
 
-Run the repository’s full lint, type, runtime, 100% per-file coverage, audit, packed-package, package-manager, and supported-Node checks before treating a source change as release-ready. Do not weaken coverage or compatibility assertions to accommodate an implementation change.
+Run the repository’s full lint, type, runtime, 100% per-file coverage, audit, packed-package, package-manager, and supported-Node checks before treating a source change as release-ready. Do not weaken coverage or public-contract assertions to accommodate an implementation change.
