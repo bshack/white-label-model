@@ -187,6 +187,8 @@ The `mutate` detail is:
 
 Observation is path-based: accessing a branch creates proxies for that branch, and a direct mutation does not deep-diff unrelated state. Direct object deletion and direct `Map#set()`, `Map#delete()`, and `Map#clear()` operations are observed. Assigning the same value is ignored.
 
+When `set()`, `clear()`, or `destroy()` replaces the root, previously retained proxies still refer to their old JavaScript objects but are detached from the Model lifecycle. Mutating those detached proxies does not dispatch Model events or change the current root.
+
 Direct writes to `__proto__`, `constructor`, and `prototype` are rejected.
 
 ## Runtime validation
@@ -215,14 +217,14 @@ TypeScript and the validator solve different problems: TypeScript checks code at
 
 ## Async work stays outside state mutation
 
-Model does not turn state operations into asynchronous workflows. Resolve I/O first, then apply the result synchronously:
+Model does not own networking or turn state operations into asynchronous workflows. Resolve I/O in application-owned code, validate external data at that boundary when needed, then apply the result synchronously:
 
 ```js
 const data = await fetchData();
 model.set(data);
 ```
 
-The legacy `serviceGet()`, `servicePatch()`, `servicePost()`, and `servicePut()` methods remain no-I/O compatibility placeholders and resolve `{}`. New application networking should stay in application-owned services rather than extending Model's responsibility.
+Model 7 intentionally has no service/fetch compatibility methods. Keeping transport outside Model makes its state contract the same in browser, server, test, and request-scoped code.
 
 ## Mediator integration
 
@@ -307,7 +309,7 @@ The package currently documents Node.js as its supported server runtime. Its sta
 
 ## Event compatibility
 
-Model's local event contract and optional mediator relay now use the same EventTarget/CustomEvent semantics. The regression suite covers native listener options, cancellation return semantics, synchronous event ordering, payload identity, destroy cleanup, reuse after destroy, object/array/Map state, deep mutation detail, and browser-facing behavior. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
+Model's local event contract and optional mediator relay now use the same EventTarget/CustomEvent semantics. The regression suite covers native listener options, cancellation return semantics, synchronous event ordering, payload identity, destroy cleanup, reuse after destroy, object/array/Map state, deep mutation detail, detached-root behavior, and browser-facing behavior. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
 
 ## Development
 
@@ -321,7 +323,7 @@ npm run audit
 npm pack --dry-run
 ```
 
-Coverage enforces 100% statements, branches, functions, and lines per implementation file. CI builds authored source, uploads generated package artifacts for inspection, audits dependencies, packs the package, and verifies the packed public API across npm, Yarn, and pnpm.
+Coverage enforces 100% statements, branches, functions, and lines per implementation file. CI tests both Node 24 and the advertised Node 22.18 minimum, builds authored source, audits dependencies, packs the package, and verifies the packed public API across npm, Yarn, and pnpm. The release workflow verifies the tag against the current default-branch commit and publishes only the verified package artifact through npm trusted publishing.
 
 Implementation lives in `src/`; generated JavaScript, source maps, and declarations live in `dist/`. Edit TypeScript sources and regenerate `dist` rather than hand-editing generated output.
 
