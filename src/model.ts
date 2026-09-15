@@ -35,11 +35,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 /** Create a shallow merge using enumerable own properties while blocking prototype-pollution keys. */
 function extend(
-    object1: Record<string, unknown> | null,
+    object1: Record<string, unknown>,
     object2: Record<string, unknown> | null
 ): Record<string, unknown> {
-    const prototype = object1 ? Object.getPrototypeOf(object1) : Object.prototype;
-    const result = Object.create(prototype) as Record<PropertyKey, unknown>;
+    const result = Object.create(Object.getPrototypeOf(object1)) as Record<PropertyKey, unknown>;
     const blockedKeys = new Set(['__proto__', 'constructor', 'prototype']);
     for (const source of [object1, object2]) {
         if (!source) {continue;}
