@@ -22,7 +22,7 @@ interface EventEmitterApi {
     eventNames(): EventName[];
 }
 
-const EventEmitter: new () => EventEmitterApi = RuntimeEventEmitter;
+const EventEmitter = RuntimeEventEmitter as unknown as new () => EventEmitterApi;
 
 interface ApplicationMediator {
     dispatchEvent(event: Event): boolean;
