@@ -4,17 +4,12 @@ interface ApplicationMediator {
     dispatchEvent(event: Event): boolean;
 }
 
-/** Shared type guards, safe merges, and standards-based model events. */
+/** Shared internal type guards, safe merges, and standards-based Model events. */
 class Utilities extends EventTarget {
     label = '';
     name: string | false = false;
     mediator: ApplicationMediator | false = false;
     #listenerController = new AbortController();
-
-    /** Create an instance with its own state and listener lifecycle. */
-    constructor() {
-        super();
-    }
 
     /**
      * Register a native listener owned by this instance's lifecycle.
@@ -49,24 +44,13 @@ class Utilities extends EventTarget {
         this.#listenerController = new AbortController();
     }
 
-    /** Internal lifecycle hook retained for Model.destroy(). */
-    protected removeAllListeners(): this {
-        this.resetEventListeners();
-        return this;
-    }
-
     /** Recognize native Map objects, including Maps created in another realm. */
-    isMap(object: unknown): object is Map<unknown, unknown> {
+    protected isMap(object: unknown): object is Map<unknown, unknown> {
         return Object.prototype.toString.call(object) === '[object Map]';
     }
 
-    /** @deprecated Use Number.isFinite directly; retained for compatibility. */
-    isFinite(number: unknown): number is number {
-        return Number.isFinite(number);
-    }
-
     /** Accept ordinary objects and objects with a null prototype, including ordinary objects from another realm. */
-    isPlainObject(object: unknown): object is Record<string, unknown> {
+    protected isPlainObject(object: unknown): object is Record<string, unknown> {
         if (Object.prototype.toString.call(object) !== '[object Object]') {
             return false;
         }
@@ -81,23 +65,14 @@ class Utilities extends EventTarget {
             Function.prototype.toString.call(constructor) === Function.prototype.toString.call(Object);
     }
 
-    /** @deprecated Use Array.prototype.splice directly; retained for compatibility. */
-    pullAt<T>(data: T[], index: number): T[] {
-        data.splice(index, 1);
-        return data;
-    }
-
     /** Create a shallow merge using enumerable own properties while blocking prototype-pollution keys. */
-    extend(object1: Record<string, unknown> | null, object2: Record<string, unknown> | null): Record<string, unknown> {
+    protected extend(object1: Record<string, unknown> | null, object2: Record<string, unknown> | null): Record<string, unknown> {
         const prototype = object1 ? Object.getPrototypeOf(object1) : Object.prototype;
         const result = Object.create(prototype) as Record<PropertyKey, unknown>;
         const blockedKeys = new Set(['__proto__', 'constructor', 'prototype']);
 
         [object1, object2].forEach((source) => {
-            if (!source) {
-                return;
-            }
-
+            if (!source) {return;}
             Reflect.ownKeys(source).forEach((key) => {
                 if ((typeof key !== 'string' || !blockedKeys.has(key)) &&
                     Object.prototype.propertyIsEnumerable.call(source, key)) {
@@ -110,20 +85,16 @@ class Utilities extends EventTarget {
     }
 
     /** Dispatch each local CustomEvent and, when configured, relay its detail through the application mediator. */
-    message(messages: string[], data: unknown): boolean {
-        if (data) {
-            for (const message of messages) {
-                this.dispatchEvent(new CustomEvent(message, {detail: data}));
-                if (this.name && this.mediator) {
-                    this.mediator.dispatchEvent(new CustomEvent(
-                        this.label + ':' + this.name + ':' + message,
-                        {detail: data}
-                    ));
-                }
+    protected dispatchMessages(messages: string[], data: unknown): void {
+        for (const message of messages) {
+            this.dispatchEvent(new CustomEvent(message, {detail: data}));
+            if (this.name && this.mediator) {
+                this.mediator.dispatchEvent(new CustomEvent(
+                    this.label + ':' + this.name + ':' + message,
+                    {detail: data}
+                ));
             }
-            return true;
         }
-        return false;
     }
 }
 
