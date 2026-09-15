@@ -31,8 +31,8 @@ describe('Unified Model', () => {
         const change = mock.fn();
         const set = mock.fn();
         const model = new Model({name: 'Ada'}, value => !Array.isArray(value) && value.name !== 'invalid');
-        model.on('change', change);
-        model.on('set', set);
+        model.addEventListener('change', change);
+        model.addEventListener('set', set);
         assert.equal(model.set({name: 'Grace'}), true);
         assert.equal(change.mock.callCount(), 1);
         assert.equal(set.mock.callCount(), 1);
@@ -48,7 +48,7 @@ describe('Unified Model', () => {
     it('updates object roots with a shallow merge', () => {
         const model = new Model({name: 'Ada', meta: {active: true}});
         const change = mock.fn();
-        model.on('change', change);
+        model.addEventListener('change', change);
         assert.equal(model.update({name: 'Grace'}), true);
         assert.deepEqual(model.get(), {name: 'Grace', meta: {active: true}});
         assert.equal(model.update({meta: {active: false}}, true), true);
@@ -98,7 +98,7 @@ describe('Unified Model', () => {
     it('pushes one or many array values and supports silence and validation', () => {
         const model = new Model([], value => value.length <= 3);
         const push = mock.fn();
-        model.on('push', push);
+        model.addEventListener('push', push);
         assert.equal(model.push('a'), true);
         assert.equal(model.push(['b', 'c'], true), true);
         assert.deepEqual(model.get(), ['a', 'b', 'c']);
@@ -176,7 +176,8 @@ describe('Unified Model', () => {
 
     it('initializes, destroys, and provides empty service hooks', async () => {
         const model = new Model({name: 'Ada'});
-        model.on('change', () => {});
+        const change = mock.fn();
+        model.addEventListener('change', change);
         assert.equal(model.initialize(), model);
         assert.deepEqual(await model.serviceGet(), {});
         assert.deepEqual(await model.servicePatch(), {});
@@ -184,6 +185,7 @@ describe('Unified Model', () => {
         assert.deepEqual(await model.servicePut(), {});
         assert.equal(model.destroy(), model);
         assert.deepEqual(model.get(), {});
-        assert.deepEqual(model.eventNames(), []);
+        model.dispatchEvent(new CustomEvent('change', {detail: model.get()}));
+        assert.equal(change.mock.callCount(), 0);
     });
 });
