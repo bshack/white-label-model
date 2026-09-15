@@ -1,30 +1,56 @@
-# Event compatibility and dependency assessment
+# EventTarget contract and Model 7 migration
 
-## Two intentionally different event boundaries
+## Runtime model
 
-`white-label-model` has two event responsibilities and they intentionally use different contracts in Model 7:
+`white-label-model` 7 uses the platform `EventTarget` contract for both local Model notifications and optional application-wide mediator relays.
 
-1. **Local Model events** (`change`, `set`, `update`, `push`, `delete`, `clear`, `mutate`) retain the existing EventEmitter-style API.
-2. **Optional application-wide mediator relays** use the web-standard `EventTarget` / `CustomEvent` contract.
+Local Model events are:
 
-This separation keeps the existing Model subscription API stable while allowing application-wide White Label messaging to align with `white-label-mediator` 5.
+- `change`
+- `set`
+- `update`
+- `push`
+- `delete`
+- `clear`
+- `mutate`
 
-## Local Model runtime resolution
+Each event is dispatched synchronously as a `CustomEvent`. The Model state or mutation payload is available through `event.detail`.
 
-Model imports `events`. Node resolves that name to its built-in EventEmitter; browser bundlers resolve the installed `events` npm package. The lockfile currently selects `events@3.3.0` for browser builds.
+This aligns Model with `white-label-mediator` 5 instead of maintaining a separate EventEmitter vocabulary for local state events.
 
-`test/events-compatibility.test.js` exercises compiled Model classes against both implementations using the same local-event contract. Preserve these behaviors unless a future Model major release deliberately changes its own event API:
+## Local listener lifecycle
 
-- synchronous, ordered dispatch;
-- listeners receive the emitter as `this`, all arguments, and original payload references;
-- `emit()` returns whether listeners handled the event;
-- `on`/`addListener`, `once`, `removeListener`/`off`, `removeAllListeners`, and chaining;
-- recursive `once` behavior and callback removal semantics;
-- duplicate listener registration/removal behavior;
-- mutation during emission follows the retained EventEmitter snapshot behavior;
-- string and symbol event names, prepend methods, listener inspection APIs, meta-events, error behavior, validation, and max-listener settings covered by the shared regression contract.
+Model inherits from native `EventTarget`. `addEventListener()` is overridden only to combine an optional caller-provided `AbortSignal` with the Model's own lifecycle signal. Native EventTarget still owns registration identity, `once`, capture matching, cancellation behavior, and listener invocation.
 
-Model lifecycle tests additionally verify silent destruction, supported root shapes, validation, event ordering, and payload identity.
+`destroy()` silently clears Model state, aborts the Model-owned listener lifecycle, and leaves the same Model instance reusable. New listeners may be registered after destruction.
+
+Supported runtimes therefore need native:
+
+- `EventTarget`
+- `CustomEvent`
+- `AbortController`
+- `AbortSignal.any()`
+
+## Contract under test
+
+The regression suite protects the behavior White Label depends on:
+
+- synchronous local event delivery;
+- Model instances being native `EventTarget` instances;
+- state and mutation payload identity through `CustomEvent.detail`;
+- local event order (`change` before the operation-specific event);
+- standard duplicate-registration and removal behavior;
+- standard `{once: true}` behavior, including re-entrant dispatch;
+- caller-provided AbortSignal cleanup;
+- native `dispatchEvent()` cancellation return semantics;
+- silent mutation options suppressing Model-generated events;
+- `destroy()` removing Model-owned listeners without emitting cleanup events;
+- reusing a Model after `destroy()`;
+- the same event contract for object, array, and Map roots;
+- deep-mutation detail and mediator relay behavior; and
+- the same contract in supported Node runtimes without `window` or `document`.
+
+`test/browser-smoke.js` exercises the browser-facing EventTarget contract without an EventEmitter polyfill.
 
 ## Application mediator relay
 
@@ -36,57 +62,67 @@ model:<name>:<event>
 
 The assigned mediator is structural: Model requires `dispatchEvent(event)` and does not import `white-label-mediator`.
 
-The original Model payload is carried in `CustomEvent.detail`:
+The original Model payload is carried in `CustomEvent.detail` at both boundaries:
 
 ```js
+model.addEventListener('change', event => {
+    console.log(event.detail);
+});
+
 mediator.addEventListener('model:profile:change', event => {
     console.log(event.detail);
 });
 ```
 
-This relay is synchronous because native `dispatchEvent()` is synchronous. Its return value is intentionally ignored: EventTarget's boolean describes cancellation semantics, not whether a listener existed.
-
-The relay tests use native `EventTarget` directly. They verify object, array, and Map state, namespaced ordering relative to local Model events, payload identity through `detail`, and deep-mutation relay behavior.
-
-## Why Model still depends on `events`
-
-Mediator 5 no longer requires the npm `events` package, but Model still does because its **own public local event API remains EventEmitter-style**. Removing that dependency would require a separate Model major release and would also affect consumers such as `white-label-view` that currently subscribe with `on('change', ...)` and `removeListener(...)`.
-
-Do not remove or replace Model's local EventEmitter backend as part of Mediator 5 integration work.
-
-## Browser verification
-
-`test/browser-smoke.js` exercises Model's browser-facing local event behavior after bundling. Browser bundlers should continue resolving the npm `events` implementation for Model itself.
-
-The application mediator bridge uses global `EventTarget` and `CustomEvent`; supported runtimes must provide those standards. The documented Node versions do.
+Local delivery occurs before the matching mediator relay. Relay cancellation does not change the Model mutation result because EventTarget's boolean describes event cancellation, not whether a listener existed or whether state should be rolled back.
 
 ## Migration from Model 6
 
-Model 6 accepted an EventEmitter-compatible object for `model.mediator` and called `mediator.emit(name, payload)`.
+Model 6 used EventEmitter semantics for local events and accepted an EventEmitter-compatible `model.mediator`.
 
-Model 7 requires an EventTarget-compatible object and dispatches:
+Model 7 standardizes both boundaries on EventTarget/CustomEvent.
+
+### Local subscriptions
 
 ```js
-new CustomEvent(name, {detail: payload})
+// Model 6
+model.on('change', state => render(state));
+model.once('change', state => initialize(state));
+model.removeListener('change', handleChange);
+
+// Model 7
+model.addEventListener('change', event => render(event.detail));
+model.addEventListener('change', event => initialize(event.detail), {once: true});
+model.removeEventListener('change', handleChange);
 ```
 
-Therefore application code listening to namespaced Model relays must change from:
+### Mediator subscriptions
 
 ```js
-mediator.on('model:profile:update', state => {
-    console.log(state);
+// Model 6
+mediator.on('model:profile:update', state => render(state));
+
+// Model 7
+mediator.addEventListener('model:profile:update', event => render(event.detail));
+```
+
+EventEmitter-specific APIs are intentionally not reproduced as part of the Model 7 public contract. That includes `emit`, `on`, `once`, `addListener`, `off`, `removeListener`, listener inspection, prepend methods, symbol event names, max-listener settings, meta-events, and EventEmitter's special `error` behavior.
+
+Applications should use ordinary JavaScript exceptions for errors rather than relying on EventEmitter's special `error` event semantics.
+
+## TypeScript
+
+The public `Model<T>` type maps each known Model event name to its `CustomEvent.detail` type. Listener registration and removal are typed:
+
+```ts
+const model = new Model<{name: string}>({name: 'Ada'});
+
+model.addEventListener('change', event => {
+    event.detail.name.toUpperCase();
 });
 ```
 
-to:
-
-```js
-mediator.addEventListener('model:profile:update', event => {
-    console.log(event.detail);
-});
-```
-
-Model's own local `model.on(...)`, `model.emit(...)`, `model.once(...)`, and `model.removeListener(...)` contracts are unchanged.
+`dispatchEvent()` remains the native EventTarget method. The compile-time event map does not add runtime payload validation to arbitrary caller-dispatched events.
 
 ## Validation
 
@@ -102,4 +138,4 @@ npm run audit
 npm pack --dry-run
 ```
 
-Coverage remains 100% per implementation file. The EventEmitter backend matrix protects local Model behavior, while dedicated EventTarget relay tests protect the application mediator boundary.
+Coverage remains 100% per implementation file. Dedicated runtime, type-consumer, browser-consumer, server-runtime, deep-mutation, and mediator-relay tests protect the standardized event boundary.
