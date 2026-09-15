@@ -11,14 +11,14 @@ test('service extension hooks resolve empty data without making network requests
     }
 });
 
-test('safe merges tolerate absent sources and falsey notifications do not emit', () => {
+test('safe merges tolerate absent sources and falsey notifications do not dispatch', () => {
     const utilities = new Utilities();
     assert.deepEqual(utilities.extend(null, {a: 1}), {a: 1});
     assert.deepEqual(utilities.extend({b: 2}, null), {b: 2});
-    let emitted = false;
-    utilities.on('change', () => {emitted = true;});
+    let dispatched = false;
+    utilities.addEventListener('change', () => {dispatched = true;});
     assert.equal(utilities.message(['change'], null), false);
-    assert.equal(emitted, false);
+    assert.equal(dispatched, false);
 });
 
 test('Map-shaped Model replaces values including supported falsey updates', () => {
