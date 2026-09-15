@@ -1,8 +1,8 @@
-# EventTarget contract and Model 7 migration
+# EventTarget contract
 
 ## Runtime model
 
-`white-label-model` 7 uses the platform `EventTarget` contract for both local Model notifications and optional application-wide mediator relays.
+`white-label-model` uses the platform `EventTarget` contract for both local Model notifications and optional application-wide mediator relays.
 
 Local Model events are:
 
@@ -16,11 +16,9 @@ Local Model events are:
 
 Each event is dispatched synchronously as a `CustomEvent`. The Model state or mutation payload is available through `event.detail`.
 
-This aligns Model with `white-label-mediator` 5 instead of maintaining a separate EventEmitter vocabulary for local state events.
-
 ## Local listener lifecycle
 
-Model inherits from native `EventTarget`. `addEventListener()` is overridden only to combine an optional caller-provided `AbortSignal` with the Model's own lifecycle signal. Native EventTarget still owns registration identity, `once`, capture matching, cancellation behavior, and listener invocation.
+Model inherits from native `EventTarget`. `addEventListener()` is overridden only to combine an optional caller-provided `AbortSignal` with the Model's own lifecycle signal. Native EventTarget owns registration identity, `once`, capture matching, cancellation behavior, and listener invocation.
 
 `destroy()` silently clears Model state, aborts the Model-owned listener lifecycle, and leaves the same Model instance reusable. New listeners may be registered after destruction.
 
@@ -57,7 +55,7 @@ The regression suite protects the behavior White Label depends on:
 - deep-mutation detail and mediator relay behavior; and
 - the same contract in supported Node runtimes without `window` or `document`.
 
-`test/browser-smoke.js` exercises the browser-facing EventTarget contract without an EventEmitter polyfill.
+`test/browser-smoke.js` exercises the browser-facing EventTarget contract.
 
 ## Application mediator relay
 
@@ -82,42 +80,6 @@ mediator.addEventListener('model:profile:change', event => {
 ```
 
 Local delivery occurs before the matching mediator relay. Relay cancellation does not change the Model mutation result because EventTarget's boolean describes event cancellation, not whether a listener existed or whether state should be rolled back.
-
-## Migration from Model 6
-
-Model 6 used EventEmitter semantics for local events, accepted an EventEmitter-compatible `model.mediator`, and exposed compatibility methods that were outside Model's state responsibility.
-
-Model 7 standardizes both event boundaries on EventTarget/CustomEvent and removes legacy service/utility compatibility surface rather than carrying it into another major.
-
-### Local subscriptions
-
-```js
-// Model 6
-model.on('change', state => render(state));
-model.once('change', state => initialize(state));
-model.removeListener('change', handleChange);
-
-// Model 7
-model.addEventListener('change', event => render(event.detail));
-model.addEventListener('change', event => initialize(event.detail), {once: true});
-model.removeEventListener('change', handleChange);
-```
-
-### Mediator subscriptions
-
-```js
-// Model 6
-mediator.on('model:profile:update', state => render(state));
-
-// Model 7
-mediator.addEventListener('model:profile:update', event => render(event.detail));
-```
-
-EventEmitter-specific APIs are intentionally not reproduced as part of the Model 7 public contract. That includes `emit`, `on`, `once`, `addListener`, `off`, `removeListener`, listener inspection, prepend methods, symbol event names, max-listener settings, meta-events, and EventEmitter's special `error` behavior.
-
-The old no-op `serviceGet()`, `servicePatch()`, `servicePost()`, and `servicePut()` placeholders and inherited compatibility utilities are also removed. Networking and persistence remain application-owned concerns.
-
-Applications should use ordinary JavaScript exceptions for errors rather than relying on EventEmitter's special `error` event semantics.
 
 ## TypeScript
 
@@ -147,4 +109,4 @@ npm run audit
 npm pack --dry-run
 ```
 
-Coverage remains 100% per implementation file. Dedicated runtime, type-consumer, browser-consumer, server-runtime, deep-mutation, detached-root, and mediator-relay tests protect the standardized event boundary.
+Coverage remains 100% per implementation file. Dedicated runtime, type-consumer, browser-consumer, server-runtime, deep-mutation, detached-root, and mediator-relay tests protect the event boundary.
