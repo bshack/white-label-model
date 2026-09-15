@@ -31,6 +31,12 @@ Supported runtimes therefore need native:
 - `AbortController`
 - `AbortSignal.any()`
 
+## Observable-root lifecycle
+
+Deep proxies belong to the root generation that created them. When `set()`, `clear()`, or `destroy()` replaces the root, a previously retained proxy still references its old JavaScript object, but it is detached from the Model event lifecycle. Mutating that detached object does not dispatch `change` or `mutate` for the current Model state.
+
+This prevents stale references from reporting false current-state changes while keeping deep observation lazy and path-based.
+
 ## Contract under test
 
 The regression suite protects the behavior White Label depends on:
@@ -46,6 +52,7 @@ The regression suite protects the behavior White Label depends on:
 - silent mutation options suppressing Model-generated events;
 - `destroy()` removing Model-owned listeners without emitting cleanup events;
 - reusing a Model after `destroy()`;
+- detached old-root proxies not publishing current-state events;
 - the same event contract for object, array, and Map roots;
 - deep-mutation detail and mediator relay behavior; and
 - the same contract in supported Node runtimes without `window` or `document`.
@@ -78,9 +85,9 @@ Local delivery occurs before the matching mediator relay. Relay cancellation doe
 
 ## Migration from Model 6
 
-Model 6 used EventEmitter semantics for local events and accepted an EventEmitter-compatible `model.mediator`.
+Model 6 used EventEmitter semantics for local events, accepted an EventEmitter-compatible `model.mediator`, and exposed compatibility methods that were outside Model's state responsibility.
 
-Model 7 standardizes both boundaries on EventTarget/CustomEvent.
+Model 7 standardizes both event boundaries on EventTarget/CustomEvent and removes legacy service/utility compatibility surface rather than carrying it into another major.
 
 ### Local subscriptions
 
@@ -107,6 +114,8 @@ mediator.addEventListener('model:profile:update', event => render(event.detail))
 ```
 
 EventEmitter-specific APIs are intentionally not reproduced as part of the Model 7 public contract. That includes `emit`, `on`, `once`, `addListener`, `off`, `removeListener`, listener inspection, prepend methods, symbol event names, max-listener settings, meta-events, and EventEmitter's special `error` behavior.
+
+The old no-op `serviceGet()`, `servicePatch()`, `servicePost()`, and `servicePut()` placeholders and inherited compatibility utilities are also removed. Networking and persistence remain application-owned concerns.
 
 Applications should use ordinary JavaScript exceptions for errors rather than relying on EventEmitter's special `error` event semantics.
 
@@ -138,4 +147,4 @@ npm run audit
 npm pack --dry-run
 ```
 
-Coverage remains 100% per implementation file. Dedicated runtime, type-consumer, browser-consumer, server-runtime, deep-mutation, and mediator-relay tests protect the standardized event boundary.
+Coverage remains 100% per implementation file. Dedicated runtime, type-consumer, browser-consumer, server-runtime, deep-mutation, detached-root, and mediator-relay tests protect the standardized event boundary.
