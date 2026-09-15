@@ -1,49 +1,42 @@
 /** @module src/utilities */
-import {EventEmitter as RuntimeEventEmitter} from 'events';
-
-type EventName = string | symbol;
-type EventListener = (...arguments_: unknown[]) => void;
-
-interface EventEmitterApi {
-    addListener(eventName: EventName, listener: EventListener): this;
-    on(eventName: EventName, listener: EventListener): this;
-    once(eventName: EventName, listener: EventListener): this;
-    removeListener(eventName: EventName, listener: EventListener): this;
-    off(eventName: EventName, listener: EventListener): this;
-    removeAllListeners(eventName?: EventName): this;
-    setMaxListeners(count: number): this;
-    getMaxListeners(): number;
-    listeners(eventName: EventName): EventListener[];
-    rawListeners(eventName: EventName): EventListener[];
-    emit(eventName: EventName, ...arguments_: unknown[]): boolean;
-    listenerCount(eventName: EventName): number;
-    prependListener(eventName: EventName, listener: EventListener): this;
-    prependOnceListener(eventName: EventName, listener: EventListener): this;
-    eventNames(): EventName[];
-}
-
-const EventEmitter = RuntimeEventEmitter as unknown as new () => EventEmitterApi;
 
 interface ApplicationMediator {
     dispatchEvent(event: Event): boolean;
 }
 
-
-
-/*
-UTILITIES
-*/
-
-/** Shared type guards, safe merges, and namespaced model events. */
-class Utilities extends EventEmitter {
+/** Shared type guards, safe merges, and standards-based model events. */
+class Utilities extends EventTarget {
     label = '';
     name: string | false = false;
     mediator: ApplicationMediator | false = false;
+    #listenerController = new AbortController();
 
-    /** Create an instance with its own state and listener references. */
+    /** Create an instance with its own state and listener lifecycle. */
     constructor() {
         super();
-        this.label = '';
+    }
+
+    /**
+     * Register a native listener owned by this instance's lifecycle.
+     * Caller signals remain effective while destroy() can still release every owned listener.
+     */
+    override addEventListener(
+        type: string,
+        callback: EventListenerOrEventListenerObject | null,
+        options?: boolean | AddEventListenerOptions
+    ): void {
+        const settings = typeof options === 'boolean' ? {capture: options} : options ?? {};
+        const lifecycleSignal = this.#listenerController.signal;
+        const signal = settings.signal
+            ? AbortSignal.any([settings.signal, lifecycleSignal])
+            : lifecycleSignal;
+        super.addEventListener(type, callback, {...settings, signal});
+    }
+
+    /** Release every locally owned listener while leaving the EventTarget reusable. */
+    protected resetEventListeners(): void {
+        this.#listenerController.abort();
+        this.#listenerController = new AbortController();
     }
 
     /** Recognize native Map objects, including Maps created in another realm. */
@@ -100,11 +93,11 @@ class Utilities extends EventEmitter {
         return result as Record<string, unknown>;
     }
 
-    /** Emit each local event and, when configured, dispatch a namespaced application event for truthy data. */
+    /** Dispatch each local CustomEvent and, when configured, relay its detail through the application mediator. */
     message(messages: string[], data: unknown): boolean {
         if (data) {
             for (const message of messages) {
-                this.emit(message, data);
+                this.dispatchEvent(new CustomEvent(message, {detail: data}));
                 if (this.name && this.mediator) {
                     this.mediator.dispatchEvent(new CustomEvent(
                         this.label + ':' + this.name + ':' + message,
