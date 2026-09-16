@@ -327,8 +327,9 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     /** Return all state or one object property, array index, or Map entry. */
     get(key?: unknown): unknown {
         if (arguments.length === 0) {return this.modelData;}
-        if (isMap(this.modelData)) {return this.modelData.get(key);}
-        if (Array.isArray(this.modelData)) {return Number.isInteger(key) ? this.modelData[key as number] : undefined;}
+        const raw = this.rawState();
+        if (isMap(raw)) {return (this.modelData as Map<unknown, unknown>).get(key);}
+        if (Array.isArray(raw)) {return Number.isInteger(key) ? (this.modelData as unknown[])[key as number] : undefined;}
         if (typeof key === 'string' || typeof key === 'symbol' || typeof key === 'number') {
             return Reflect.get(this.modelData, typeof key === 'number' ? String(key) : key);
         }
@@ -385,14 +386,15 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
             return true;
         }
         if (!isMap(raw)) {return false;}
-        if (isMap(key)) {
+        const rawKey = this.toRaw(key);
+        if (isMap(rawKey)) {
             if (arguments.length > 2 || (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean')) {return false;}
             if (this.validator) {
                 const candidate = new Map(raw);
-                key.forEach((value, mapKey) => candidate.set(mapKey, this.toRaw(value)));
+                rawKey.forEach((value, mapKey) => candidate.set(mapKey, this.toRaw(value)));
                 if (!this.accepts(candidate)) {return false;}
             }
-            key.forEach((value, mapKey) => raw.set(mapKey, this.toRaw(value)));
+            rawKey.forEach((value, mapKey) => raw.set(mapKey, this.toRaw(value)));
             if (dataOrSilent !== true) {this.#dispatchMessages(['change', 'push'], this.get());}
             return true;
         }
