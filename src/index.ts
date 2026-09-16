@@ -2,7 +2,7 @@
 import ModelImplementation = require('./model');
 
 type ModelData = Record<PropertyKey, unknown> | unknown[] | Map<unknown, unknown>;
-type ModelEventMethod = 'addEventListener' | 'removeEventListener';
+type ModelEventMethod = 'addEventListener' | 'removeEventListener' | 'initialize' | 'destroy';
 
 interface ModelMutation<T extends ModelData> {
     operation: 'set' | 'delete' | 'clear';
@@ -37,6 +37,8 @@ type Model<T extends ModelData = Record<string, unknown>> = Omit<ModelImplementa
         callback: ModelEventListener<T, Name>,
         options?: boolean | EventListenerOptions
     ): void;
+    initialize(): Model<T>;
+    destroy(): Model<T>;
 };
 
 interface ModelConstructor {
