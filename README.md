@@ -114,15 +114,34 @@ people.update('ada', {name: 'Ada Lovelace'});
 | `push(...)` | Append array values or add Map entries. | `true` when accepted; `false` for an invalid call, object state, or validator rejection. |
 | `delete(key, silent?)` | Delete one object property, array index, or Map entry. | `true` when removed; `false` when the member does not exist or validation rejects the result. |
 | `clear(silent?)` | Reset to an empty value of the current root shape. | Always `true`. |
+| `batch(callback)` | Run synchronous mutations while coalescing Model-generated `change` notifications into one final notification. | The callback's return value. |
 | `destroy()` | Clear silently and release listeners. | The same reusable `Model` instance after cleanup. |
 
 Passing `true` as the final `silent` argument suppresses Model-generated events. Mutation methods are synchronous: their return value is available only after validation and the accepted state change have completed.
 
 `update()` shallow-merges plain objects and blocks `__proto__`, `constructor`, and `prototype` from merge input. It does not recursively merge nested objects.
 
+## Batch related mutations
+
+Use `batch(callback)` when several synchronous mutations form one logical state transition and downstream `change` listeners do expensive work such as rendering.
+
+```js
+model.batch(() => {
+    model.update({firstName: 'Grace'});
+    model.update({lastName: 'Hopper'});
+    model.get().preferences.theme = 'dark';
+});
+```
+
+Inside a batch, accepted mutations happen immediately and `get()` always exposes the current state. Operation-specific events such as `update` and `mutate` also remain synchronous. Only Model-generated `change` notifications are coalesced. The outermost batch emits at most one final `change` with the complete final state if at least one non-silent or directly observed mutation requested a change notification.
+
+Nested batches participate in the same outer transaction. Explicit mutations performed with `silent: true` do not independently request the final `change`, although their resulting state is included if another mutation in the batch does. Mediator relays follow the same rule: operation-specific relays remain immediate and `model:<name>:change` is coalesced with the local `change` event.
+
+`batch()` is synchronous and returns the callback's value. If the callback throws after a change-producing mutation, Model flushes the pending final `change` before the callback error continues to the caller. This keeps listeners synchronized with state that was already committed.
+
 ## Events
 
-Successful non-silent explicit mutations dispatch `change` followed by their operation event: `set`, `update`, `push`, `delete`, or `clear`. Payloads are carried in `CustomEvent.detail`, matching `white-label-mediator`.
+Successful non-silent explicit mutations dispatch `change` followed by their operation event: `set`, `update`, `push`, `delete`, or `clear`. Payloads are carried in `CustomEvent.detail`, matching `white-label-mediator`. Inside `batch()`, only `change` is deferred; operation events retain their normal synchronous order.
 
 ```js
 model.addEventListener('change', event => {
@@ -274,6 +293,8 @@ TypeScript describes expected values to the compiler but does not validate data 
 
 Deep observation is lazy and does not impose a configured nesting-depth limit. The regression suite covers very deep paths, unrelated throwing getters, 20,000 unrelated properties, and repeated observed nested writes. Timing tests are regression guards rather than universal performance guarantees; application listeners, validation, path depth, and runtime conditions still matter.
 
+For mutation-heavy synchronous workflows, `batch()` can reduce repeated work performed by `change` listeners without adding deep-equality scans or changing the timing of the mutations themselves.
+
 ## Serverless and function runtimes
 
 Use a request-scoped Model for mutable request data. Serverless platforms can reuse one warm process for many sequential or overlapping invocations, so a module-level Model can retain state or listeners from an earlier request unless that shared lifetime is explicitly intended.
@@ -286,7 +307,7 @@ The package currently documents Node.js as its supported server runtime. Its sta
 
 ## Event contract
 
-Model's local event contract and optional mediator relay use the same EventTarget/CustomEvent semantics. The regression suite covers native listener options, cancellation return semantics, synchronous event ordering, payload identity, destroy cleanup, reuse after destroy, object/array/Map state, deep mutation detail, detached-root behavior, and browser-facing behavior. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
+Model's local event contract and optional mediator relay use the same EventTarget/CustomEvent semantics. The regression suite covers native listener options, cancellation return semantics, synchronous event ordering, payload identity, destroy cleanup, reuse after destroy, object/array/Map state, deep mutation detail, detached-root behavior, batching, and browser-facing behavior. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for details.
 
 ## Development
 
