@@ -4,6 +4,10 @@ const objectModel = new Model<{name: string}>({name: 'Ada'});
 objectModel.update({name: 'Grace'});
 objectModel.mediator = new EventTarget();
 const name: string | undefined = objectModel.get().name;
+const batchResult: string = objectModel.batch(() => {
+    objectModel.update({name: 'Katherine'});
+    return 'done';
+});
 
 const arrayModel = new Model<unknown[]>([{name: 'Ada'}]);
 arrayModel.push({name: 'Lin'});
@@ -24,5 +28,7 @@ new Model<string>('Ada');
 new Model<{name: string}>({name: 'Ada'}, () => 'valid');
 // @ts-expect-error mediator relays require the standards-based dispatchEvent contract.
 objectModel.mediator = {emit() {return true;}};
+// @ts-expect-error batch requires a callback.
+objectModel.batch('not a callback');
 
-void [name, arrayModel.get(), mapModel.get(), validated.get()];
+void [name, batchResult, arrayModel.get(), mapModel.get(), validated.get()];

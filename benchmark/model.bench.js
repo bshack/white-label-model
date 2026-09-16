@@ -65,4 +65,30 @@ rows.push(measure('Map member update', 50_000, iterations => {
     }
 }));
 
+function consumeChange(event) {
+    JSON.stringify(event.detail);
+}
+
+const unbatchedModel = new Model({count: 0, label: 'benchmark'});
+unbatchedModel.addEventListener('change', consumeChange);
+rows.push(measure('10 updates + synchronous change consumer', 5_000, iterations => {
+    for (let index = 0; index < iterations; index += 1) {
+        for (let update = 0; update < 10; update += 1) {
+            unbatchedModel.update({count: update});
+        }
+    }
+}));
+
+const batchedModel = new Model({count: 0, label: 'benchmark'});
+batchedModel.addEventListener('change', consumeChange);
+rows.push(measure('10 batched updates + synchronous change consumer', 5_000, iterations => {
+    for (let index = 0; index < iterations; index += 1) {
+        batchedModel.batch(() => {
+            for (let update = 0; update < 10; update += 1) {
+                batchedModel.update({count: update});
+            }
+        });
+    }
+}));
+
 console.table(rows);

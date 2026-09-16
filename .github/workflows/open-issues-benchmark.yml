@@ -1,0 +1,31 @@
+name: Open issues benchmark
+
+on:
+  push:
+    branches:
+      - future/address-open-issues
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24.21.0
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Compare generated implementation size
+        run: |
+          npm run build >/dev/null
+          git show origin/master:dist/model.js > /tmp/model-master.js
+          echo "master_dist_model_bytes=$(wc -c < /tmp/model-master.js)"
+          echo "branch_dist_model_bytes=$(wc -c < dist/model.js)"
+          echo "master_dist_model_gzip_bytes=$(gzip -9 -c /tmp/model-master.js | wc -c)"
+          echo "branch_dist_model_gzip_bytes=$(gzip -9 -c dist/model.js | wc -c)"
