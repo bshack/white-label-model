@@ -7,6 +7,8 @@ These instructions are more specific than the repository-root agent guide for fi
 - `Model` directly extends native `EventTarget`. Local Model events and optional mediator relays use `EventTarget`, `CustomEvent`, and `CustomEvent.detail`.
 - The public Model surface is the documented state API plus native EventTarget listener methods; keep internal helpers private.
 - Model owns observable state only. Networking, persistence, rendering, routing, and application-wide orchestration remain outside the package.
+- Treat package independence and incremental adoption as architectural requirements. Model should remain useful by itself inside an existing server-rendered application, a progressively enhanced feature, browser code, server code, or tests; do not make View, Router, Mediator, React, or another framework a required dependency.
+- Prefer structural web-platform integration over product-specific adapters. External APIs, CMS/commerce platforms, framework stores, and persistence systems should validate/translate data at the application boundary and then use the normal Model contract.
 - Preserve synchronous mutation return values, `silent` semantics, event order, object/array/Map behavior, and whole-state `CustomEvent.detail` payload identity.
 - Deep observation must remain lazy and path-based. Do not add whole-tree scans or diffs for ordinary nested mutations.
 - A proxy retained from a replaced/cleared/destroyed root may still mutate that detached object, but it must never publish events as if it belonged to the current Model root.
