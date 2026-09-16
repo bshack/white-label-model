@@ -9,6 +9,7 @@ test('accepts cross-realm Maps and rejects Symbol.toStringTag Map spoofs', () =>
     const crossRealmMap = vm.runInNewContext('new Map([["profile", {active: true}]])');
     const model = new Model(crossRealmMap);
 
+    assert.equal(model.get()[Symbol.toStringTag], 'Map');
     assert.equal(model.get('profile').active, true);
     model.get('profile').active = false;
     assert.equal(model.get('profile').active, false);
