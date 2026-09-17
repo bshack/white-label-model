@@ -44,12 +44,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 /** Create a shallow merge using enumerable own properties while blocking prototype-pollution keys. */
 function extend(
     object1: Record<string, unknown>,
-    object2: Record<string, unknown> | null
+    object2: Record<string, unknown>
 ): Record<string, unknown> {
     const result = Object.create(Object.getPrototypeOf(object1)) as Record<PropertyKey, unknown>;
     const blockedKeys = new Set(['__proto__', 'constructor', 'prototype']);
     for (const source of [object1, object2]) {
-        if (!source) {continue;}
         for (const key of Reflect.ownKeys(source)) {
             if ((typeof key !== 'string' || !blockedKeys.has(key)) &&
                 Object.prototype.propertyIsEnumerable.call(source, key)) {
@@ -75,7 +74,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     name: string | false = false;
     mediator: ApplicationMediator | false = false;
     readonly #proxyTargets = new WeakMap<object, object>();
-    readonly #mapChildCaches = new WeakMap<Map<unknown, unknown>, ObservedChildCache[]>();
+    #rootMapChildCache: ObservedChildCache | undefined;
     #generation = 0;
     #listenerController = new AbortController();
 
@@ -164,23 +163,6 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
             (property === '__proto__' || property === 'constructor' || property === 'prototype');
     }
 
-    /** Keep every proxy cache for one raw Map synchronized with raw mutations. */
-    private registerMapCache(value: Map<unknown, unknown>, cache: ObservedChildCache): void {
-        const caches = this.#mapChildCaches.get(value);
-        if (caches) {caches.push(cache);}
-        else {this.#mapChildCaches.set(value, [cache]);}
-    }
-
-    /** Release an observed Map value after replacement or deletion. */
-    private invalidateMapValue(value: Map<unknown, unknown>, key: unknown): void {
-        for (const cache of this.#mapChildCaches.get(value)!) {cache.delete(key);}
-    }
-
-    /** Release all observed Map values after clearing the Map. */
-    private invalidateAllMapValues(value: Map<unknown, unknown>): void {
-        for (const cache of this.#mapChildCaches.get(value)!) {cache.clear();}
-    }
-
     /** Return the raw root container. */
     private rawState(): ModelData {return this.toRaw(this.modelData) as ModelData;}
 
@@ -211,6 +193,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     /** Observe plain objects and arrays lazily along accessed branches. */
     private observeObject(value: object, path: unknown[], generation: number): object {
         const childCache = new Map<PropertyKey, {raw: object; proxy: object}>();
+        if (path.length === 0) {this.#rootMapChildCache = undefined;}
         const proxy = new Proxy(value, {
             get: (target, property, receiver) => {
                 const hasOwnProperty = Object.prototype.hasOwnProperty.call(target, property);
@@ -248,7 +231,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     /** Observe Map values and mutators without scanning unrelated entries. */
     private observeMap(value: Map<unknown, unknown>, path: unknown[], generation: number): Map<unknown, unknown> {
         const childCache: ObservedChildCache = new Map();
-        this.registerMapCache(value, childCache);
+        if (path.length === 0) {this.#rootMapChildCache = childCache;}
         const observeValue = (key: unknown, item: unknown): unknown => {
             const rawItem = this.toRaw(item);
             if (!this.isObservable(rawItem)) {return item;}
@@ -268,7 +251,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         const hadKey = target.has(key);
                         const oldValue = this.toRaw(target.get(key));
                         if (hadKey && Object.is(oldValue, rawNextValue)) {return proxy;}
-                        this.invalidateMapValue(target, key);
+                        childCache.delete(key);
                         target.set(key, rawNextValue);
                         this.notifyMutation(generation, 'set', path.concat(key), oldValue, rawNextValue);
                         return proxy;
@@ -280,7 +263,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         const oldValue = this.toRaw(target.get(key));
                         const removed = target.delete(key);
                         if (removed) {
-                            this.invalidateMapValue(target, key);
+                            childCache.delete(key);
                             this.notifyMutation(generation, 'delete', path.concat(key), oldValue, undefined);
                         }
                         return removed;
@@ -291,7 +274,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         if (target.size === 0) {return;}
                         const oldValue = new Map(target);
                         target.clear();
-                        this.invalidateAllMapValues(target);
+                        childCache.clear();
                         this.notifyMutation(generation, 'clear', path, oldValue, target);
                     };
                 }
@@ -377,7 +360,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
             if (!this.accepts(candidate)) {return false;}
         }
         if (isMapState) {
-            this.invalidateMapValue(raw, keyOrData);
+            this.#rootMapChildCache!.delete(keyOrData);
             raw.set(keyOrData, nextValue);
         } else {(raw as unknown[])[keyOrData as number] = nextValue;}
         if (!silent) {this.#dispatchMessages(['change', 'update'], this.get());}
@@ -408,7 +391,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 if (!this.accepts(candidate)) {return false;}
             }
             rawKey.forEach((value, mapKey) => {
-                this.invalidateMapValue(raw, mapKey);
+                this.#rootMapChildCache!.delete(mapKey);
                 raw.set(mapKey, this.toRaw(value));
             });
             if (dataOrSilent !== true) {this.#dispatchMessages(['change', 'push'], this.get());}
@@ -421,7 +404,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
             candidate.set(key, rawValue);
             if (!this.accepts(candidate)) {return false;}
         }
-        this.invalidateMapValue(raw, key);
+        this.#rootMapChildCache!.delete(key);
         raw.set(key, rawValue);
         if (!silent) {this.#dispatchMessages(['change', 'push'], this.get());}
         return true;
@@ -457,7 +440,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
 
         if (isMapState) {
             if (!raw.delete(key)) {return false;}
-            this.invalidateMapValue(raw, key);
+            this.#rootMapChildCache!.delete(key);
         } else if (isArrayState) {raw.splice(key as number, 1);}
         else if (!Reflect.deleteProperty(raw, objectKey)) {return false;}
         if (!silent) {this.#dispatchMessages(['change', 'delete'], this.get());}
