@@ -1,7 +1,7 @@
 {
   "name": "white-label-model",
   "version": "7.0.1",
-  "description": "Lightweight observable TypeScript state management for browser, Node.js, and request-scoped serverless function applications.",
+  "description": "Lightweight observable TypeScript state management for framework-independent browser, Node.js, progressive-enhancement, and request-scoped serverless applications.",
   "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,7 @@
   },
   "files": ["dist", "README.md", "PACKAGE_MANAGERS.md"],
   "engines": {"node": "^22.18.0 || >=24.11.0"},
-  "keywords": ["javascript", "typescript", "model", "state", "state-management", "observable", "proxy", "events", "map", "collection", "browser", "node", "server-side", "serverless", "universal", "framework-independent"],
+  "keywords": ["javascript", "typescript", "model", "state", "state-management", "observable", "observable-state", "proxy", "events", "eventtarget", "map", "collection", "progressive-enhancement", "incremental-adoption", "browser", "node", "server-side", "serverless", "universal", "framework-independent"],
   "contributors": [{"name": "Bill Shackelford", "url": "https://github.com/bshack"}],
   "scripts": {
     "build": "tsc -p tsconfig.json",
