@@ -3,6 +3,8 @@
 /** Supported root-state containers. */
 type ModelData = Record<PropertyKey, unknown> | unknown[] | Map<unknown, unknown>;
 
+type ObservedChildCache = Map<unknown, {raw: object; proxy: object}>;
+
 interface ApplicationMediator {
     dispatchEvent(event: Event): boolean;
 }
@@ -42,12 +44,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 /** Create a shallow merge using enumerable own properties while blocking prototype-pollution keys. */
 function extend(
     object1: Record<string, unknown>,
-    object2: Record<string, unknown> | null
+    object2: Record<string, unknown>
 ): Record<string, unknown> {
     const result = Object.create(Object.getPrototypeOf(object1)) as Record<PropertyKey, unknown>;
     const blockedKeys = new Set(['__proto__', 'constructor', 'prototype']);
     for (const source of [object1, object2]) {
-        if (!source) {continue;}
         for (const key of Reflect.ownKeys(source)) {
             if ((typeof key !== 'string' || !blockedKeys.has(key)) &&
                 Object.prototype.propertyIsEnumerable.call(source, key)) {
@@ -58,6 +59,14 @@ function extend(
     return result as Record<string, unknown>;
 }
 
+/** Clone an object state exactly without invoking inherited property setters. */
+function cloneObjectState(value: object): Record<PropertyKey, unknown> {
+    return Object.create(
+        Object.getPrototypeOf(value),
+        Object.getOwnPropertyDescriptors(value)
+    ) as Record<PropertyKey, unknown>;
+}
+
 /** Mutable object, array, or Map state with synchronous change notifications. */
 class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     modelData: T;
@@ -65,6 +74,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     name: string | false = false;
     mediator: ApplicationMediator | false = false;
     readonly #proxyTargets = new WeakMap<object, object>();
+    #rootMapChildCache: ObservedChildCache | undefined;
     #generation = 0;
     #listenerController = new AbortController();
 
@@ -183,8 +193,11 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     /** Observe plain objects and arrays lazily along accessed branches. */
     private observeObject(value: object, path: unknown[], generation: number): object {
         const childCache = new Map<PropertyKey, {raw: object; proxy: object}>();
+        if (path.length === 0) {this.#rootMapChildCache = undefined;}
         const proxy = new Proxy(value, {
             get: (target, property, receiver) => {
+                const hasOwnProperty = Object.prototype.hasOwnProperty.call(target, property);
+                if ((!Array.isArray(target) || this.isBlockedKey(property)) && !hasOwnProperty) {return undefined;}
                 const result = Reflect.get(target, property, receiver);
                 const rawResult = this.toRaw(result);
                 if (!this.isObservable(rawResult)) {return result;}
@@ -217,7 +230,8 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
 
     /** Observe Map values and mutators without scanning unrelated entries. */
     private observeMap(value: Map<unknown, unknown>, path: unknown[], generation: number): Map<unknown, unknown> {
-        const childCache = new Map<unknown, {raw: object; proxy: object}>();
+        const childCache: ObservedChildCache = new Map();
+        if (path.length === 0) {this.#rootMapChildCache = childCache;}
         const observeValue = (key: unknown, item: unknown): unknown => {
             const rawItem = this.toRaw(item);
             if (!this.isObservable(rawItem)) {return item;}
@@ -237,6 +251,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         const hadKey = target.has(key);
                         const oldValue = this.toRaw(target.get(key));
                         if (hadKey && Object.is(oldValue, rawNextValue)) {return proxy;}
+                        childCache.delete(key);
                         target.set(key, rawNextValue);
                         this.notifyMutation(generation, 'set', path.concat(key), oldValue, rawNextValue);
                         return proxy;
@@ -344,8 +359,10 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
             else {(candidate as unknown[])[keyOrData as number] = nextValue;}
             if (!this.accepts(candidate)) {return false;}
         }
-        if (isMapState) {raw.set(keyOrData, nextValue);}
-        else {(raw as unknown[])[keyOrData as number] = nextValue;}
+        if (isMapState) {
+            this.#rootMapChildCache!.delete(keyOrData);
+            raw.set(keyOrData, nextValue);
+        } else {(raw as unknown[])[keyOrData as number] = nextValue;}
         if (!silent) {this.#dispatchMessages(['change', 'update'], this.get());}
         return true;
     }
@@ -373,7 +390,10 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 rawKey.forEach((value, mapKey) => candidate.set(mapKey, this.toRaw(value)));
                 if (!this.accepts(candidate)) {return false;}
             }
-            rawKey.forEach((value, mapKey) => raw.set(mapKey, this.toRaw(value)));
+            rawKey.forEach((value, mapKey) => {
+                this.#rootMapChildCache!.delete(mapKey);
+                raw.set(mapKey, this.toRaw(value));
+            });
             if (dataOrSilent !== true) {this.#dispatchMessages(['change', 'push'], this.get());}
             return true;
         }
@@ -384,6 +404,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
             candidate.set(key, rawValue);
             if (!this.accepts(candidate)) {return false;}
         }
+        this.#rootMapChildCache!.delete(key);
         raw.set(key, rawValue);
         if (!silent) {this.#dispatchMessages(['change', 'push'], this.get());}
         return true;
@@ -394,6 +415,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         const raw = this.rawState();
         const isMapState = isMap(raw);
         const isArrayState = Array.isArray(raw);
+        const objectKey = typeof key === 'number' ? String(key) : key as PropertyKey;
         if (isMapState) {
             if (!raw.has(key)) {return false;}
         } else if (isArrayState) {
@@ -410,15 +432,17 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 candidate = raw.slice();
                 candidate.splice(key as number, 1);
             } else {
-                candidate = extend(raw, null);
-                Reflect.deleteProperty(candidate, typeof key === 'number' ? String(key) : key as PropertyKey);
+                candidate = cloneObjectState(raw);
+                if (!Reflect.deleteProperty(candidate, objectKey)) {return false;}
             }
             if (!this.accepts(candidate)) {return false;}
         }
 
-        if (isMapState) {raw.delete(key);}
-        else if (isArrayState) {raw.splice(key as number, 1);}
-        else {Reflect.deleteProperty(raw, typeof key === 'number' ? String(key) : key as PropertyKey);}
+        if (isMapState) {
+            if (!raw.delete(key)) {return false;}
+            this.#rootMapChildCache!.delete(key);
+        } else if (isArrayState) {raw.splice(key as number, 1);}
+        else if (!Reflect.deleteProperty(raw, objectKey)) {return false;}
         if (!silent) {this.#dispatchMessages(['change', 'delete'], this.get());}
         return true;
     }
