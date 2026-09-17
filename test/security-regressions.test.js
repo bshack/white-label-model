@@ -95,7 +95,7 @@ test('explicit Map deletion releases the observed value cache', function() {
     assert.deepEqual(secondObserved, value);
 });
 
-test('all proxy caches for an aliased Map are invalidated together', function() {
+test('aliased Map views refresh observed values after proxy replacement', function() {
     const shared = new Map([['item', {id: 1}]]);
     const model = new Model({first: shared, second: shared});
     const firstMap = model.get().first;
