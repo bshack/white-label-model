@@ -1,0 +1,73 @@
+name: Port Map hardening
+
+on:
+  push:
+    branches: [fix/map-brand-hardening]
+
+permissions:
+  contents: write
+
+jobs:
+  port:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Apply focused Map hardening
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/model.ts')
+          text = path.read_text()
+          replacements = {
+              """function isMap(value: unknown): value is Map<unknown, unknown> {\n    return Object.prototype.toString.call(value) === '[object Map]';\n}""":
+              """function isMap(value: unknown): value is Map<unknown, unknown> {\n    if (!value || typeof value !== 'object') {return false;}\n    try {\n        Map.prototype.has.call(value, value);\n        return true;\n    } catch {\n        return false;\n    }\n}""",
+              """    get(key?: unknown): unknown {\n        if (arguments.length === 0) {return this.modelData;}\n        if (isMap(this.modelData)) {return this.modelData.get(key);}\n        if (Array.isArray(this.modelData)) {return Number.isInteger(key) ? this.modelData[key as number] : undefined;}\n        if (typeof key === 'string' || typeof key === 'symbol' || typeof key === 'number') {""":
+              """    get(key?: unknown): unknown {\n        if (arguments.length === 0) {return this.modelData;}\n        const raw = this.rawState();\n        if (isMap(raw)) {return (this.modelData as Map<unknown, unknown>).get(key);}\n        if (Array.isArray(raw)) {return Number.isInteger(key) ? (this.modelData as unknown[])[key as number] : undefined;}\n        if (typeof key === 'string' || typeof key === 'symbol' || typeof key === 'number') {""",
+              """        if (!isMap(raw)) {return false;}\n        if (isMap(key)) {\n            if (arguments.length > 2 || (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean')) {return false;}\n            if (this.validator) {\n                const candidate = new Map(raw);\n                key.forEach((value, mapKey) => candidate.set(mapKey, this.toRaw(value)));\n                if (!this.accepts(candidate)) {return false;}\n            }\n            key.forEach((value, mapKey) => raw.set(mapKey, this.toRaw(value)));\n            if (dataOrSilent !== true) {this.#dispatchMessages(['change', 'push'], this.get());}\n            return true;\n        }""":
+              """        if (!isMap(raw)) {return false;}\n        const rawKey = this.toRaw(key);\n        if (isMap(rawKey)) {\n            if (arguments.length > 2 || (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean')) {return false;}\n            if (this.validator) {\n                const candidate = new Map(raw);\n                rawKey.forEach((value, mapKey) => candidate.set(mapKey, this.toRaw(value)));\n                if (!this.accepts(candidate)) {return false;}\n            }\n            rawKey.forEach((value, mapKey) => raw.set(mapKey, this.toRaw(value)));\n            if (dataOrSilent !== true) {this.#dispatchMessages(['change', 'push'], this.get());}\n            return true;\n        }""",
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'missing expected Model source block: {old[:80]}')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+
+          Path('test/map-brand.test.js').write_text(r'''\'use strict\';
+
+const assert = require('node:assert/strict');
+const test = require('node:test');
+const vm = require('node:vm');
+const {Model} = require('../dist/index');
+
+test('accepts cross-realm Maps and rejects Symbol.toStringTag Map spoofs', () => {
+    const crossRealmMap = vm.runInNewContext('new Map([["profile", {active: true}]])');
+    const model = new Model(crossRealmMap);
+
+    assert.equal(model.get()[Symbol.toStringTag], 'Map');
+    assert.equal(model.get('profile').active, true);
+    model.get('profile').active = false;
+    assert.equal(model.get('profile').active, false);
+
+    const spoofedMap = {value: 1, [Symbol.toStringTag]: 'Map'};
+    assert.throws(() => new Model(spoofedMap), /plain object, array, or Map/);
+});
+
+test('Map detection preserves observable Map proxy behavior', () => {
+    const source = new Model(new Map([['first', {active: true}]]));
+    const target = new Model(new Map());
+
+    assert.equal(target.push(source.get()), true);
+    assert.equal(target.get('first').active, true);
+    target.get('first').active = false;
+    assert.equal(target.get('first').active, false);
+});
+''')
+          PY
+          rm .github/workflows/port-map-hardening.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/model.ts test/map-brand.test.js .github/workflows/port-map-hardening.yml
+          git commit -m "Harden Map detection against brand spoofing"
+          git push
