@@ -18,12 +18,12 @@ test('accepts cross-realm Maps and rejects Symbol.toStringTag Map spoofs', () =>
     assert.throws(() => new Model(spoofedMap), /plain object, array, or Map/);
 });
 
-test('Map detection preserves observable Map proxy behavior', () => {
-    const source = new Model(new Map([['first', {active: true}]]));
-    const target = new Model(new Map());
+test('Map detection preserves same-model observable Map proxy behavior', () => {
+    const model = new Model(new Map([['first', {active: true}]]));
+    const observed = model.get();
 
-    assert.equal(target.push(source.get()), true);
-    assert.equal(target.get('first').active, true);
-    target.get('first').active = false;
-    assert.equal(target.get('first').active, false);
+    assert.equal(model.push(observed), true);
+    assert.equal(model.get('first').active, true);
+    model.get('first').active = false;
+    assert.equal(model.get('first').active, false);
 });
