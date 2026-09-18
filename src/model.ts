@@ -198,20 +198,68 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         }
     }
 
-    /** Dispatch deep-mutation events only while the proxy still represents its current state path. */
+    /** Find one current state path to a raw observed container without invoking accessors. */
+    private findCurrentPath(target: object): unknown[] | null {
+        const queue: Array<{value: unknown; path: unknown[]}> = [{value: this.rawState(), path: []}];
+        const seen = new WeakSet<object>();
+
+        for (let index = 0; index < queue.length; index += 1) {
+            const entry = queue[index]!;
+            const rawValue = this.toRaw(entry.value);
+            if (rawValue === target) {return entry.path;}
+            if (!this.isObservable(rawValue) || seen.has(rawValue)) {continue;}
+            seen.add(rawValue);
+
+            if (isMap(rawValue)) {
+                for (const [key, value] of rawValue) {
+                    queue.push({value, path: entry.path.concat(key)});
+                }
+                continue;
+            }
+
+            for (const key of Reflect.ownKeys(rawValue)) {
+                if (this.isBlockedKey(key)) {continue;}
+                const descriptor = Object.getOwnPropertyDescriptor(rawValue, key);
+                if (!descriptor || !('value' in descriptor)) {continue;}
+                queue.push({value: descriptor.value, path: entry.path.concat(key)});
+            }
+        }
+
+        return null;
+    }
+
+    /** Resolve the live mutation path, rebasing stale same-generation aliases when possible. */
+    private resolveMutationPath(
+        generation: number,
+        token: ObservationToken | undefined,
+        target: object,
+        containerPath: unknown[],
+        mutationPath: unknown[]
+    ): unknown[] | null {
+        if (this.isObservationActive(generation, token)) {return mutationPath;}
+        if (generation !== this.#generation) {return null;}
+        const currentContainerPath = this.findCurrentPath(target);
+        if (!currentContainerPath) {return null;}
+        return currentContainerPath.concat(mutationPath.slice(containerPath.length));
+    }
+
+    /** Dispatch deep-mutation events only while the proxy still maps to current state. */
     private notifyMutation(
         generation: number,
         token: ObservationToken | undefined,
+        target: object,
+        containerPath: unknown[],
         operation: ModelMutation<T>['operation'],
         path: unknown[],
         oldValue: unknown,
         newValue: unknown
     ): void {
-        if (!this.isObservationActive(generation, token)) {return;}
+        const resolvedPath = this.resolveMutationPath(generation, token, target, containerPath, path);
+        if (!resolvedPath) {return;}
         const state = this.get();
         const mutation: ModelMutation<T> = Object.freeze({
             operation,
-            path: Object.freeze(path.slice()),
+            path: Object.freeze(resolvedPath.slice()),
             oldValue,
             newValue,
             state
@@ -253,7 +301,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                     } else {
                         this.invalidateObservedChild(childCache, property);
                     }
-                    this.notifyMutation(generation, token, 'set', path.concat(property), oldValue, rawNextValue);
+                    this.notifyMutation(generation, token, target, path, 'set', path.concat(property), oldValue, rawNextValue);
                 }
                 return applied;
             },
@@ -263,7 +311,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 const removed = Reflect.deleteProperty(target, property);
                 if (removed) {
                     this.invalidateObservedChild(childCache, property);
-                    this.notifyMutation(generation, token, 'delete', path.concat(property), oldValue, undefined);
+                    this.notifyMutation(generation, token, target, path, 'delete', path.concat(property), oldValue, undefined);
                 }
                 return removed;
             }
@@ -298,7 +346,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         if (hadKey && Object.is(oldValue, rawNextValue)) {return proxy;}
                         this.invalidateObservedChild(childCache, key);
                         target.set(key, rawNextValue);
-                        this.notifyMutation(generation, token, 'set', path.concat(key), oldValue, rawNextValue);
+                        this.notifyMutation(generation, token, target, path, 'set', path.concat(key), oldValue, rawNextValue);
                         return proxy;
                     };
                 }
@@ -309,7 +357,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         const removed = target.delete(key);
                         if (removed) {
                             this.invalidateObservedChild(childCache, key);
-                            this.notifyMutation(generation, token, 'delete', path.concat(key), oldValue, undefined);
+                            this.notifyMutation(generation, token, target, path, 'delete', path.concat(key), oldValue, undefined);
                         }
                         return removed;
                     };
@@ -320,7 +368,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         const oldValue = new Map(target);
                         target.clear();
                         for (const key of [...childCache.keys()]) {this.invalidateObservedChild(childCache, key);}
-                        this.notifyMutation(generation, token, 'clear', path, oldValue, target);
+                        this.notifyMutation(generation, token, target, path, 'clear', path, oldValue, target);
                     };
                 }
                 if (property === 'forEach') {
