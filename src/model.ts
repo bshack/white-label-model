@@ -75,7 +75,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     name: string | false = false;
     mediator: ApplicationMediator | false = false;
     readonly #proxyTargets = new WeakMap<object, object>();
-    #rootChildCache: ObservedChildCache | undefined;
+    #rootChildCache!: ObservedChildCache;
     #generation = 0;
     #listenerController = new AbortController();
 
@@ -180,16 +180,15 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     }
 
     /** Invalidate one cached child proxy while allowing retained detached objects to remain usable. */
-    private invalidateObservedChild(cache: ObservedChildCache | undefined, key: unknown): void {
-        const cached = cache?.get(key);
+    private invalidateObservedChild(cache: ObservedChildCache, key: unknown): void {
+        const cached = cache.get(key);
         if (!cached) {return;}
         cached.token.active = false;
-        cache!.delete(key);
+        cache.delete(key);
     }
 
     /** Invalidate cached array items whose index changes after a structural root mutation. */
     private invalidateObservedArrayFrom(index: number): void {
-        if (!this.#rootChildCache) {return;}
         for (const [key, cached] of this.#rootChildCache) {
             const numericKey = typeof key === 'string' && key !== '' ? Number(key) : Number.NaN;
             if (Number.isInteger(numericKey) && numericKey >= index) {
