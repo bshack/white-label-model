@@ -187,6 +187,8 @@ Observation is path-based: accessing a branch creates proxies for that branch, a
 
 When `set()`, `clear()`, or `destroy()` replaces the root, previously retained proxies still refer to old JavaScript objects but are detached from the Model lifecycle. Mutating those detached proxies does not dispatch current Model events or change the current root.
 
+When a retained proxy becomes stale because an array item moved or one alias was replaced, Model checks whether that raw object is still reachable through the current root. If it remains live, `mutate.detail.path` is reported using a current path; if it is no longer reachable, the proxy remains detached and silent. Shared-reference graphs and circular references are supported.
+
 Direct writes to `__proto__`, `constructor`, and `prototype` are rejected.
 
 ## Runtime validation
