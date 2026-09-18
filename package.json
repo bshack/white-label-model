@@ -12,42 +12,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": [
-    "dist",
-    "README.md",
-    "PACKAGE_MANAGERS.md"
-  ],
-  "engines": {
-    "node": "^22.18.0 || >=24.11.0"
-  },
-  "keywords": [
-    "javascript",
-    "typescript",
-    "model",
-    "state",
-    "state-management",
-    "observable",
-    "observable-state",
-    "proxy",
-    "events",
-    "eventtarget",
-    "map",
-    "collection",
-    "progressive-enhancement",
-    "incremental-adoption",
-    "browser",
-    "node",
-    "server-side",
-    "serverless",
-    "universal",
-    "framework-independent"
-  ],
-  "contributors": [
-    {
-      "name": "Bill Shackelford",
-      "url": "https://github.com/bshack"
-    }
-  ],
+  "files": ["dist", "README.md", "PACKAGE_MANAGERS.md"],
+  "engines": {"node": "^22.18.0 || >=24.11.0"},
+  "keywords": ["javascript", "typescript", "model", "state", "state-management", "observable", "observable-state", "proxy", "events", "eventtarget", "map", "collection", "progressive-enhancement", "incremental-adoption", "browser", "node", "server-side", "serverless", "universal", "framework-independent"],
+  "contributors": [{"name": "Bill Shackelford", "url": "https://github.com/bshack"}],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "node --run build && node --run test:types && node --run test:browser-types && node --run test:unit",
@@ -62,18 +30,10 @@
     "test:types": "tsc -p tsconfig.consumer.json",
     "test:browser-types": "tsc -p tsconfig.browser-consumer.json"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/bshack/white-label-model.git"
-  },
-  "author": {
-    "name": "Bill Shackelford",
-    "url": "https://github.com/bshack"
-  },
+  "repository": {"type": "git", "url": "git+https://github.com/bshack/white-label-model.git"},
+  "author": {"name": "Bill Shackelford", "url": "https://github.com/bshack"},
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/bshack/white-label-model/issues"
-  },
+  "bugs": {"url": "https://github.com/bshack/white-label-model/issues"},
   "homepage": "https://whitelabeljs.org/docs/model/",
   "devDependencies": {
     "@babel/core": "8.0.5",
@@ -87,15 +47,8 @@
   },
   "c8": {
     "all": true,
-    "include": [
-      "src/**/*.ts"
-    ],
-    "reporter": [
-      "text",
-      "json",
-      "json-summary",
-      "lcov"
-    ],
+    "include": ["src/**/*.ts"],
+    "reporter": ["text", "json", "json-summary", "lcov"],
     "excludeAfterRemap": true,
     "checkCoverage": true,
     "lines": 100,
@@ -103,8 +56,6 @@
     "branches": 100,
     "statements": 100,
     "perFile": true,
-    "exclude": [
-      "**/*.d.ts"
-    ]
+    "exclude": ["**/*.d.ts"]
   }
 }
