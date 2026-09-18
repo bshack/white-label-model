@@ -107,6 +107,42 @@ describe('Model deep mutation tracking', function() {
         assert.deepEqual(mutations[0].path, ['items', '0', 'name']);
     });
 
+    it('silences detached Map values and nested paths whose parent no longer exists', function() {
+        const mapModel = new Model(new Map([['person', {name: 'Ada'}]]));
+        const mapMutations = mock.fn();
+        mapModel.addEventListener('mutate', event => mapMutations(event.detail));
+        const detachedMapValue = mapModel.get().get('person');
+        mapModel.get().delete('person');
+        mapMutations.mock.resetCalls();
+
+        detachedMapValue.name = 'Detached';
+        assert.equal(mapMutations.mock.callCount(), 0);
+
+        const objectModel = new Model({outer: {inner: {value: 1}}});
+        const objectMutations = mock.fn();
+        objectModel.addEventListener('mutate', event => objectMutations(event.detail));
+        const detachedInner = objectModel.get().outer.inner;
+        objectModel.get().outer = 1;
+        objectMutations.mock.resetCalls();
+
+        detachedInner.value = 2;
+        assert.equal(objectMutations.mock.callCount(), 0);
+    });
+
+    it('silences an old Map value proxy after the same key receives a replacement object', function() {
+        const model = new Model(new Map([['person', {name: 'Ada'}]]));
+        const mutations = mock.fn();
+        model.addEventListener('mutate', event => mutations(event.detail));
+        const detached = model.get().get('person');
+
+        model.get().set('person', {name: 'Grace'});
+        mutations.mock.resetCalls();
+        detached.name = 'Detached';
+
+        assert.equal(model.get().get('person').name, 'Grace');
+        assert.equal(mutations.mock.callCount(), 0);
+    });
+
     it('returns a stable proxy for repeated reads through the same parent', function() {
         const model = new Model({user: {profile: {name: 'Ada'}}});
 
