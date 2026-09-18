@@ -143,6 +143,61 @@ describe('Model deep mutation tracking', function() {
         assert.equal(mutations.mock.callCount(), 0);
     });
 
+    it('invalidates retained root-member proxies after explicit update and delete operations', function() {
+        const arrayModel = new Model([{name: 'Ada'}, {name: 'Grace'}]);
+        const arrayMutations = mock.fn();
+        arrayModel.addEventListener('mutate', event => arrayMutations(event.detail));
+
+        const replaced = arrayModel.get(0);
+        assert.equal(arrayModel.update(0, {name: 'Augusta'}), true);
+        arrayMutations.mock.resetCalls();
+        replaced.name = 'Detached';
+        assert.equal(arrayMutations.mock.callCount(), 0);
+
+        const shifted = arrayModel.get(1);
+        assert.equal(arrayModel.delete(0), true);
+        arrayMutations.mock.resetCalls();
+        shifted.name = 'Detached Grace';
+        assert.equal(arrayMutations.mock.callCount(), 0);
+
+        arrayModel.get(0).name = 'Grace Hopper';
+        assert.deepEqual(arrayMutations.mock.calls[0].arguments[0].path, ['0', 'name']);
+
+        const objectModel = new Model({profile: {name: 'Ada'}});
+        const objectMutations = mock.fn();
+        objectModel.addEventListener('mutate', event => objectMutations(event.detail));
+        const deleted = objectModel.get().profile;
+        assert.equal(objectModel.delete('profile'), true);
+        objectMutations.mock.resetCalls();
+
+        deleted.name = 'Detached';
+        assert.equal(objectMutations.mock.callCount(), 0);
+    });
+
+    it('invalidates retained root Map value proxies after explicit collection operations', function() {
+        const model = new Model(new Map([['person', {name: 'Ada'}]]));
+        const mutations = mock.fn();
+        model.addEventListener('mutate', event => mutations(event.detail));
+
+        const updated = model.get('person');
+        assert.equal(model.update('person', {name: 'Grace'}), true);
+        mutations.mock.resetCalls();
+        updated.name = 'Detached';
+        assert.equal(mutations.mock.callCount(), 0);
+
+        const pushed = model.get('person');
+        assert.equal(model.push('person', {name: 'Katherine'}), true);
+        mutations.mock.resetCalls();
+        pushed.name = 'Detached Grace';
+        assert.equal(mutations.mock.callCount(), 0);
+
+        const deleted = model.get('person');
+        assert.equal(model.delete('person'), true);
+        mutations.mock.resetCalls();
+        deleted.name = 'Detached Katherine';
+        assert.equal(mutations.mock.callCount(), 0);
+    });
+
     it('returns a stable proxy for repeated reads through the same parent', function() {
         const model = new Model({user: {profile: {name: 'Ada'}}});
 
