@@ -90,7 +90,7 @@ describe('Model deep mutation tracking', function() {
         assert.equal(mutations.mock.callCount(), 0);
     });
 
-    it('silences stale array-item proxies after reindexing and reports fresh paths correctly', function() {
+    it('rebases retained array-item proxies after reindexing', function() {
         const model = new Model({items: [{name: 'Ada'}, {name: 'Grace'}]});
         const mutations = [];
         model.addEventListener('mutate', event => mutations.push(event.detail));
@@ -100,11 +100,12 @@ describe('Model deep mutation tracking', function() {
         mutations.length = 0;
 
         moved.name = 'Grace Hopper';
-        assert.equal(mutations.length, 0);
-
-        model.get().items[0].name = 'Rear Admiral Hopper';
         assert.equal(mutations.length, 1);
         assert.deepEqual(mutations[0].path, ['items', '0', 'name']);
+
+        model.get().items[0].name = 'Rear Admiral Hopper';
+        assert.equal(mutations.length, 2);
+        assert.deepEqual(mutations[1].path, ['items', '0', 'name']);
     });
 
     it('silences detached Map values and nested paths whose parent no longer exists', function() {
@@ -157,11 +158,13 @@ describe('Model deep mutation tracking', function() {
         const shifted = arrayModel.get(1);
         assert.equal(arrayModel.delete(0), true);
         arrayMutations.mock.resetCalls();
-        shifted.name = 'Detached Grace';
-        assert.equal(arrayMutations.mock.callCount(), 0);
-
-        arrayModel.get(0).name = 'Grace Hopper';
+        shifted.name = 'Grace Hopper';
+        assert.equal(arrayMutations.mock.callCount(), 1);
         assert.deepEqual(arrayMutations.mock.calls[0].arguments[0].path, ['0', 'name']);
+
+        arrayModel.get(0).name = 'Rear Admiral Hopper';
+        assert.equal(arrayMutations.mock.callCount(), 2);
+        assert.deepEqual(arrayMutations.mock.calls[1].arguments[0].path, ['0', 'name']);
 
         const objectModel = new Model({profile: {name: 'Ada'}});
         const objectMutations = mock.fn();
@@ -244,6 +247,45 @@ describe('Model deep mutation tracking', function() {
         assert.deepEqual(mutations[0].path, ['0', 'name']);
         assert.equal(mutations[1].path[0], metadata);
         assert.equal(mutations[1].path[1], 'active');
+    });
+
+    it('rebases a stale proxy when its raw object remains live through another alias', function() {
+        const shared = {count: 0};
+        const model = new Model({left: shared, right: shared});
+        const changes = mock.fn();
+        const mutations = mock.fn();
+        model.addEventListener('change', changes);
+        model.addEventListener('mutate', event => mutations(event.detail));
+
+        const staleLeft = model.get().left;
+        model.get().left = {count: 10};
+        changes.mock.resetCalls();
+        mutations.mock.resetCalls();
+
+        staleLeft.count = 2;
+
+        assert.equal(model.get().right.count, 2);
+        assert.equal(changes.mock.callCount(), 1);
+        assert.equal(mutations.mock.callCount(), 1);
+        assert.deepEqual(mutations.mock.calls[0].arguments[0].path, ['right', 'count']);
+    });
+
+    it('rebases a stale circular proxy back to the live root path', function() {
+        const state = {name: 'root'};
+        state.self = state;
+        const model = new Model(state);
+        const mutations = mock.fn();
+        model.addEventListener('mutate', event => mutations(event.detail));
+
+        const staleSelf = model.get().self;
+        model.get().self = {name: 'replacement'};
+        mutations.mock.resetCalls();
+
+        staleSelf.name = 'updated root';
+
+        assert.equal(model.get().name, 'updated root');
+        assert.equal(mutations.mock.callCount(), 1);
+        assert.deepEqual(mutations.mock.calls[0].arguments[0].path, ['name']);
     });
 
     it('returns a stable proxy for repeated reads through the same parent', function() {
