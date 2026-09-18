@@ -204,7 +204,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         const seen = new WeakSet<object>();
 
         for (let index = 0; index < queue.length; index += 1) {
-            const entry = queue[index];
+            const entry = queue[index]!;
             const rawValue = this.toRaw(entry.value);
             if (rawValue === target) {return entry.path;}
             if (!this.isObservable(rawValue) || seen.has(rawValue)) {continue;}
