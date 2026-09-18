@@ -3,7 +3,8 @@
 /** Supported root-state containers. */
 type ModelData = Record<PropertyKey, unknown> | unknown[] | Map<unknown, unknown>;
 
-type ObservedChildCache = Map<unknown, {raw: object; proxy: object}>;
+type ObservationToken = {active: boolean; parent?: ObservationToken};
+type ObservedChildCache = Map<unknown, {raw: object; proxy: object; token: ObservationToken}>;
 
 interface ApplicationMediator {
     dispatchEvent(event: Event): boolean;
@@ -74,7 +75,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     name: string | false = false;
     mediator: ApplicationMediator | false = false;
     readonly #proxyTargets = new WeakMap<object, object>();
-    #rootMapChildCache: ObservedChildCache | undefined;
+    #rootChildCache!: ObservedChildCache;
     #generation = 0;
     #listenerController = new AbortController();
 
@@ -169,15 +170,44 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     /** Apply the optional validator to an explicit candidate state. */
     private accepts(candidate: ModelData): boolean {return !this.validator || this.validator(candidate);}
 
-    /** Dispatch deep-mutation events for the current root generation only. */
+    /** Return whether this proxy and every observed ancestor still represent current state. */
+    private isObservationActive(generation: number, token?: ObservationToken): boolean {
+        if (generation !== this.#generation) {return false;}
+        for (let current = token; current; current = current.parent) {
+            if (!current.active) {return false;}
+        }
+        return true;
+    }
+
+    /** Invalidate one cached child proxy while allowing retained detached objects to remain usable. */
+    private invalidateObservedChild(cache: ObservedChildCache, key: unknown): void {
+        const cached = cache.get(key);
+        if (!cached) {return;}
+        cached.token.active = false;
+        cache.delete(key);
+    }
+
+    /** Invalidate cached array items whose index changes after a structural root mutation. */
+    private invalidateObservedArrayFrom(index: number): void {
+        for (const [key, cached] of this.#rootChildCache) {
+            const numericKey = typeof key === 'string' && key !== '' ? Number(key) : Number.NaN;
+            if (Number.isInteger(numericKey) && numericKey >= index) {
+                cached.token.active = false;
+                this.#rootChildCache.delete(key);
+            }
+        }
+    }
+
+    /** Dispatch deep-mutation events only while the proxy still represents its current state path. */
     private notifyMutation(
         generation: number,
+        token: ObservationToken | undefined,
         operation: ModelMutation<T>['operation'],
         path: unknown[],
         oldValue: unknown,
         newValue: unknown
     ): void {
-        if (generation !== this.#generation) {return;}
+        if (!this.isObservationActive(generation, token)) {return;}
         const state = this.get();
         const mutation: ModelMutation<T> = Object.freeze({
             operation,
@@ -191,9 +221,9 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     }
 
     /** Observe plain objects and arrays lazily along accessed branches. */
-    private observeObject(value: object, path: unknown[], generation: number): object {
-        const childCache = new Map<PropertyKey, {raw: object; proxy: object}>();
-        if (path.length === 0) {this.#rootMapChildCache = undefined;}
+    private observeObject(value: object, path: unknown[], generation: number, token?: ObservationToken): object {
+        const childCache: ObservedChildCache = new Map();
+        if (path.length === 0) {this.#rootChildCache = childCache;}
         const proxy = new Proxy(value, {
             get: (target, property, receiver) => {
                 const hasOwnProperty = Object.prototype.hasOwnProperty.call(target, property);
@@ -203,8 +233,9 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 if (!this.isObservable(rawResult)) {return result;}
                 const cached = childCache.get(property);
                 if (cached && cached.raw === rawResult) {return cached.proxy;}
-                const childProxy = this.observe(rawResult, path.concat(property), generation);
-                childCache.set(property, {raw: rawResult, proxy: childProxy});
+                const childToken: ObservationToken = token ? {active: true, parent: token} : {active: true};
+                const childProxy = this.observe(rawResult, path.concat(property), generation, childToken);
+                childCache.set(property, {raw: rawResult, proxy: childProxy, token: childToken});
                 return childProxy;
             },
             set: (target, property, nextValue) => {
@@ -213,14 +244,27 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 const oldValue = this.toRaw(Reflect.get(target, property, target));
                 if (Object.is(oldValue, rawNextValue)) {return true;}
                 const applied = Reflect.set(target, property, rawNextValue, target);
-                if (applied) {this.notifyMutation(generation, 'set', path.concat(property), oldValue, rawNextValue);}
+                if (applied) {
+                    if (Array.isArray(target) && property === 'length' && typeof rawNextValue === 'number' && rawNextValue < Number(oldValue)) {
+                        for (const key of [...childCache.keys()]) {
+                            const numericKey = typeof key === 'string' && key !== '' ? Number(key) : Number.NaN;
+                            if (Number.isInteger(numericKey) && numericKey >= rawNextValue) {this.invalidateObservedChild(childCache, key);}
+                        }
+                    } else {
+                        this.invalidateObservedChild(childCache, property);
+                    }
+                    this.notifyMutation(generation, token, 'set', path.concat(property), oldValue, rawNextValue);
+                }
                 return applied;
             },
             deleteProperty: (target, property) => {
                 if (!Object.prototype.hasOwnProperty.call(target, property)) {return true;}
                 const oldValue = this.toRaw(Reflect.get(target, property, target));
                 const removed = Reflect.deleteProperty(target, property);
-                if (removed) {this.notifyMutation(generation, 'delete', path.concat(property), oldValue, undefined);}
+                if (removed) {
+                    this.invalidateObservedChild(childCache, property);
+                    this.notifyMutation(generation, token, 'delete', path.concat(property), oldValue, undefined);
+                }
                 return removed;
             }
         });
@@ -229,16 +273,17 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     }
 
     /** Observe Map values and mutators without scanning unrelated entries. */
-    private observeMap(value: Map<unknown, unknown>, path: unknown[], generation: number): Map<unknown, unknown> {
+    private observeMap(value: Map<unknown, unknown>, path: unknown[], generation: number, token?: ObservationToken): Map<unknown, unknown> {
         const childCache: ObservedChildCache = new Map();
-        if (path.length === 0) {this.#rootMapChildCache = childCache;}
+        if (path.length === 0) {this.#rootChildCache = childCache;}
         const observeValue = (key: unknown, item: unknown): unknown => {
             const rawItem = this.toRaw(item);
             if (!this.isObservable(rawItem)) {return item;}
             const cached = childCache.get(key);
             if (cached && cached.raw === rawItem) {return cached.proxy;}
-            const childProxy = this.observe(rawItem, path.concat(key), generation);
-            childCache.set(key, {raw: rawItem, proxy: childProxy});
+            const childToken: ObservationToken = token ? {active: true, parent: token} : {active: true};
+            const childProxy = this.observe(rawItem, path.concat(key), generation, childToken);
+            childCache.set(key, {raw: rawItem, proxy: childProxy, token: childToken});
             return childProxy;
         };
         const proxy = new Proxy(value, {
@@ -251,9 +296,9 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         const hadKey = target.has(key);
                         const oldValue = this.toRaw(target.get(key));
                         if (hadKey && Object.is(oldValue, rawNextValue)) {return proxy;}
-                        childCache.delete(key);
+                        this.invalidateObservedChild(childCache, key);
                         target.set(key, rawNextValue);
-                        this.notifyMutation(generation, 'set', path.concat(key), oldValue, rawNextValue);
+                        this.notifyMutation(generation, token, 'set', path.concat(key), oldValue, rawNextValue);
                         return proxy;
                     };
                 }
@@ -263,8 +308,8 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         const oldValue = this.toRaw(target.get(key));
                         const removed = target.delete(key);
                         if (removed) {
-                            childCache.delete(key);
-                            this.notifyMutation(generation, 'delete', path.concat(key), oldValue, undefined);
+                            this.invalidateObservedChild(childCache, key);
+                            this.notifyMutation(generation, token, 'delete', path.concat(key), oldValue, undefined);
                         }
                         return removed;
                     };
@@ -274,8 +319,8 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         if (target.size === 0) {return;}
                         const oldValue = new Map(target);
                         target.clear();
-                        childCache.clear();
-                        this.notifyMutation(generation, 'clear', path, oldValue, target);
+                        for (const key of [...childCache.keys()]) {this.invalidateObservedChild(childCache, key);}
+                        this.notifyMutation(generation, token, 'clear', path, oldValue, target);
                     };
                 }
                 if (property === 'forEach') {
@@ -302,8 +347,8 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     }
 
     /** Wrap one supported container lazily so mutations never require a full-tree scan. */
-    private observe(value: ModelData, path: unknown[], generation: number): object {
-        return isMap(value) ? this.observeMap(value, path, generation) : this.observeObject(value, path, generation);
+    private observe(value: ModelData, path: unknown[], generation: number, token?: ObservationToken): object {
+        return isMap(value) ? this.observeMap(value, path, generation, token) : this.observeObject(value, path, generation, token);
     }
 
     /** Replace all model state. */
@@ -360,9 +405,12 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
             if (!this.accepts(candidate)) {return false;}
         }
         if (isMapState) {
-            this.#rootMapChildCache!.delete(keyOrData);
+            this.invalidateObservedChild(this.#rootChildCache, keyOrData);
             raw.set(keyOrData, nextValue);
-        } else {(raw as unknown[])[keyOrData as number] = nextValue;}
+        } else {
+            this.invalidateObservedChild(this.#rootChildCache, String(keyOrData));
+            (raw as unknown[])[keyOrData as number] = nextValue;
+        }
         if (!silent) {this.#dispatchMessages(['change', 'update'], this.get());}
         return true;
     }
@@ -391,7 +439,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 if (!this.accepts(candidate)) {return false;}
             }
             rawKey.forEach((value, mapKey) => {
-                this.#rootMapChildCache!.delete(mapKey);
+                this.invalidateObservedChild(this.#rootChildCache, mapKey);
                 raw.set(mapKey, this.toRaw(value));
             });
             if (dataOrSilent !== true) {this.#dispatchMessages(['change', 'push'], this.get());}
@@ -404,7 +452,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
             candidate.set(key, rawValue);
             if (!this.accepts(candidate)) {return false;}
         }
-        this.#rootMapChildCache!.delete(key);
+        this.invalidateObservedChild(this.#rootChildCache, key);
         raw.set(key, rawValue);
         if (!silent) {this.#dispatchMessages(['change', 'push'], this.get());}
         return true;
@@ -440,9 +488,15 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
 
         if (isMapState) {
             if (!raw.delete(key)) {return false;}
-            this.#rootMapChildCache!.delete(key);
-        } else if (isArrayState) {raw.splice(key as number, 1);}
-        else if (!Reflect.deleteProperty(raw, objectKey)) {return false;}
+            this.invalidateObservedChild(this.#rootChildCache, key);
+        } else if (isArrayState) {
+            this.invalidateObservedArrayFrom(key as number);
+            raw.splice(key as number, 1);
+        }
+        else {
+            if (!Reflect.deleteProperty(raw, objectKey)) {return false;}
+            this.invalidateObservedChild(this.#rootChildCache, objectKey);
+        }
         if (!silent) {this.#dispatchMessages(['change', 'delete'], this.get());}
         return true;
     }

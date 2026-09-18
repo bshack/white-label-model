@@ -70,6 +70,182 @@ describe('Model deep mutation tracking', function() {
         ]);
     });
 
+    it('does not emit from a nested proxy after its path is replaced', function() {
+        const model = new Model({profile: {name: 'Ada'}});
+        const changes = mock.fn();
+        const mutations = mock.fn();
+        model.addEventListener('change', changes);
+        model.addEventListener('mutate', event => mutations(event.detail));
+
+        const detached = model.get().profile;
+        model.get().profile = {name: 'Grace'};
+        changes.mock.resetCalls();
+        mutations.mock.resetCalls();
+
+        detached.name = 'Detached';
+
+        assert.equal(model.get().profile.name, 'Grace');
+        assert.equal(detached.name, 'Detached');
+        assert.equal(changes.mock.callCount(), 0);
+        assert.equal(mutations.mock.callCount(), 0);
+    });
+
+    it('silences stale array-item proxies after reindexing and reports fresh paths correctly', function() {
+        const model = new Model({items: [{name: 'Ada'}, {name: 'Grace'}]});
+        const mutations = [];
+        model.addEventListener('mutate', event => mutations.push(event.detail));
+
+        const moved = model.get().items[1];
+        model.get().items.shift();
+        mutations.length = 0;
+
+        moved.name = 'Grace Hopper';
+        assert.equal(mutations.length, 0);
+
+        model.get().items[0].name = 'Rear Admiral Hopper';
+        assert.equal(mutations.length, 1);
+        assert.deepEqual(mutations[0].path, ['items', '0', 'name']);
+    });
+
+    it('silences detached Map values and nested paths whose parent no longer exists', function() {
+        const mapModel = new Model(new Map([['person', {name: 'Ada'}]]));
+        const mapMutations = mock.fn();
+        mapModel.addEventListener('mutate', event => mapMutations(event.detail));
+        const detachedMapValue = mapModel.get().get('person');
+        mapModel.get().delete('person');
+        mapMutations.mock.resetCalls();
+
+        detachedMapValue.name = 'Detached';
+        assert.equal(mapMutations.mock.callCount(), 0);
+
+        const objectModel = new Model({outer: {inner: {value: 1}}});
+        const objectMutations = mock.fn();
+        objectModel.addEventListener('mutate', event => objectMutations(event.detail));
+        const detachedInner = objectModel.get().outer.inner;
+        objectModel.get().outer = 1;
+        objectMutations.mock.resetCalls();
+
+        detachedInner.value = 2;
+        assert.equal(objectMutations.mock.callCount(), 0);
+    });
+
+    it('silences an old Map value proxy after the same key receives a replacement object', function() {
+        const model = new Model(new Map([['person', {name: 'Ada'}]]));
+        const mutations = mock.fn();
+        model.addEventListener('mutate', event => mutations(event.detail));
+        const detached = model.get().get('person');
+
+        model.get().set('person', {name: 'Grace'});
+        mutations.mock.resetCalls();
+        detached.name = 'Detached';
+
+        assert.equal(model.get().get('person').name, 'Grace');
+        assert.equal(mutations.mock.callCount(), 0);
+    });
+
+    it('invalidates retained root-member proxies after explicit update and delete operations', function() {
+        const arrayModel = new Model([{name: 'Ada'}, {name: 'Grace'}]);
+        const arrayMutations = mock.fn();
+        arrayModel.addEventListener('mutate', event => arrayMutations(event.detail));
+
+        const replaced = arrayModel.get(0);
+        assert.equal(arrayModel.update(0, {name: 'Augusta'}), true);
+        arrayMutations.mock.resetCalls();
+        replaced.name = 'Detached';
+        assert.equal(arrayMutations.mock.callCount(), 0);
+
+        const shifted = arrayModel.get(1);
+        assert.equal(arrayModel.delete(0), true);
+        arrayMutations.mock.resetCalls();
+        shifted.name = 'Detached Grace';
+        assert.equal(arrayMutations.mock.callCount(), 0);
+
+        arrayModel.get(0).name = 'Grace Hopper';
+        assert.deepEqual(arrayMutations.mock.calls[0].arguments[0].path, ['0', 'name']);
+
+        const objectModel = new Model({profile: {name: 'Ada'}});
+        const objectMutations = mock.fn();
+        objectModel.addEventListener('mutate', event => objectMutations(event.detail));
+        const deleted = objectModel.get().profile;
+        assert.equal(objectModel.delete('profile'), true);
+        objectMutations.mock.resetCalls();
+
+        deleted.name = 'Detached';
+        assert.equal(objectMutations.mock.callCount(), 0);
+    });
+
+    it('invalidates retained root Map value proxies after explicit collection operations', function() {
+        const model = new Model(new Map([['person', {name: 'Ada'}]]));
+        const mutations = mock.fn();
+        model.addEventListener('mutate', event => mutations(event.detail));
+
+        const updated = model.get('person');
+        assert.equal(model.update('person', {name: 'Grace'}), true);
+        mutations.mock.resetCalls();
+        updated.name = 'Detached';
+        assert.equal(mutations.mock.callCount(), 0);
+
+        const pushed = model.get('person');
+        assert.equal(model.push('person', {name: 'Katherine'}), true);
+        mutations.mock.resetCalls();
+        pushed.name = 'Detached Grace';
+        assert.equal(mutations.mock.callCount(), 0);
+
+        const deleted = model.get('person');
+        assert.equal(model.delete('person'), true);
+        mutations.mock.resetCalls();
+        deleted.name = 'Detached Katherine';
+        assert.equal(mutations.mock.callCount(), 0);
+    });
+
+    it('invalidates truncated array items without detaching non-index properties', function() {
+        const metadata = Symbol('metadata');
+        const model = new Model({items: [{name: 'Ada'}, {name: 'Grace'}]});
+        model.get().items[metadata] = {active: true};
+        const removed = model.get().items[1];
+        const retainedMetadata = model.get().items[metadata];
+        const mutations = [];
+        model.addEventListener('mutate', event => mutations.push(event.detail));
+
+        model.get().items.length = 1;
+        mutations.length = 0;
+
+        removed.name = 'Detached';
+        assert.equal(mutations.length, 0);
+
+        retainedMetadata.active = false;
+        assert.equal(mutations.length, 1);
+        assert.equal(mutations[0].path[0], 'items');
+        assert.equal(mutations[0].path[1], metadata);
+        assert.equal(mutations[0].path[2], 'active');
+    });
+
+    it('keeps unaffected root-array proxies active when explicit deletion reindexes later items', function() {
+        const metadata = Symbol('metadata');
+        const model = new Model([{name: 'Ada'}, {name: 'Grace'}, {name: 'Katherine'}]);
+        model.get()[metadata] = {active: true};
+
+        const first = model.get(0);
+        const removed = model.get(1);
+        const metadataProxy = model.get()[metadata];
+        const mutations = [];
+        model.addEventListener('mutate', event => mutations.push(event.detail));
+
+        assert.equal(model.delete(1), true);
+        mutations.length = 0;
+
+        removed.name = 'Detached';
+        assert.equal(mutations.length, 0);
+
+        first.name = 'Ada Lovelace';
+        metadataProxy.active = false;
+
+        assert.equal(mutations.length, 2);
+        assert.deepEqual(mutations[0].path, ['0', 'name']);
+        assert.equal(mutations[1].path[0], metadata);
+        assert.equal(mutations[1].path[1], 'active');
+    });
+
     it('returns a stable proxy for repeated reads through the same parent', function() {
         const model = new Model({user: {profile: {name: 'Ada'}}});
 
