@@ -288,6 +288,26 @@ describe('Model deep mutation tracking', function() {
         assert.deepEqual(mutations.mock.calls[0].arguments[0].path, ['name']);
     });
 
+    it('rebases a stale Map value proxy to another live key alias', function() {
+        const shared = {count: 0};
+        const model = new Model(new Map([
+            ['left', shared],
+            ['right', shared]
+        ]));
+        const mutations = mock.fn();
+        model.addEventListener('mutate', event => mutations(event.detail));
+
+        const staleLeft = model.get().get('left');
+        model.get().delete('left');
+        mutations.mock.resetCalls();
+
+        staleLeft.count = 2;
+
+        assert.equal(model.get().get('right').count, 2);
+        assert.equal(mutations.mock.callCount(), 1);
+        assert.deepEqual(mutations.mock.calls[0].arguments[0].path, ['right', 'count']);
+    });
+
     it('stale-alias recovery skips accessors, blocked keys, and descriptor-less proxy keys', function() {
         let getterCalls = 0;
         let descriptorCalls = 0;
