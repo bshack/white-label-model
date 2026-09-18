@@ -198,6 +198,28 @@ describe('Model deep mutation tracking', function() {
         assert.equal(mutations.mock.callCount(), 0);
     });
 
+    it('invalidates truncated array items without detaching non-index properties', function() {
+        const metadata = Symbol('metadata');
+        const model = new Model({items: [{name: 'Ada'}, {name: 'Grace'}]});
+        model.get().items[metadata] = {active: true};
+        const removed = model.get().items[1];
+        const retainedMetadata = model.get().items[metadata];
+        const mutations = [];
+        model.addEventListener('mutate', event => mutations.push(event.detail));
+
+        model.get().items.length = 1;
+        mutations.length = 0;
+
+        removed.name = 'Detached';
+        assert.equal(mutations.length, 0);
+
+        retainedMetadata.active = false;
+        assert.equal(mutations.length, 1);
+        assert.equal(mutations[0].path[0], 'items');
+        assert.equal(mutations[0].path[1], metadata);
+        assert.equal(mutations[0].path[2], 'active');
+    });
+
     it('returns a stable proxy for repeated reads through the same parent', function() {
         const model = new Model({user: {profile: {name: 'Ada'}}});
 
