@@ -288,6 +288,47 @@ describe('Model deep mutation tracking', function() {
         assert.deepEqual(mutations.mock.calls[0].arguments[0].path, ['name']);
     });
 
+    it('stale-alias recovery skips accessors, blocked keys, and descriptor-less proxy keys', function() {
+        let getterCalls = 0;
+        let descriptorCalls = 0;
+        const ghost = new Proxy({}, {
+            ownKeys() {return ['ghost'];},
+            getOwnPropertyDescriptor() {
+                descriptorCalls += 1;
+                return undefined;
+            }
+        });
+        const state = {
+            stale: {value: 1},
+            ghost
+        };
+        Object.defineProperty(state, 'lazy', {
+            enumerable: true,
+            get() {
+                getterCalls += 1;
+                return {value: 'side effect'};
+            }
+        });
+        Object.defineProperty(state, 'constructor', {
+            configurable: true,
+            enumerable: true,
+            value: {value: 'blocked'}
+        });
+
+        const model = new Model(state);
+        const mutations = mock.fn();
+        model.addEventListener('mutate', event => mutations(event.detail));
+        const detached = model.get().stale;
+        model.get().stale = {value: 2};
+        mutations.mock.resetCalls();
+
+        detached.value = 3;
+
+        assert.equal(mutations.mock.callCount(), 0);
+        assert.equal(getterCalls, 0);
+        assert.equal(descriptorCalls > 0, true);
+    });
+
     it('returns a stable proxy for repeated reads through the same parent', function() {
         const model = new Model({user: {profile: {name: 'Ada'}}});
 
