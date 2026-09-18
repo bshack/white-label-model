@@ -169,15 +169,39 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     /** Apply the optional validator to an explicit candidate state. */
     private accepts(candidate: ModelData): boolean {return !this.validator || this.validator(candidate);}
 
-    /** Dispatch deep-mutation events for the current root generation only. */
+    /** Return whether an observed container still occupies the path that created its proxy. */
+    private isAttachedAtPath(target: object, path: unknown[], generation: number): boolean {
+        if (generation !== this.#generation) {return false;}
+        let current: unknown = this.rawState();
+        if (path.length === 0) {return current === target;}
+
+        for (const segment of path) {
+            const rawCurrent = this.toRaw(current);
+            if (isMap(rawCurrent)) {
+                if (!rawCurrent.has(segment)) {return false;}
+                current = rawCurrent.get(segment);
+                continue;
+            }
+            if (!Array.isArray(rawCurrent) && !isPlainObject(rawCurrent)) {return false;}
+            const property = segment as PropertyKey;
+            if (!Object.prototype.hasOwnProperty.call(rawCurrent, property)) {return false;}
+            current = Reflect.get(rawCurrent, property, rawCurrent);
+        }
+
+        return this.toRaw(current) === target;
+    }
+
+    /** Dispatch deep-mutation events only while the proxy still represents its current state path. */
     private notifyMutation(
         generation: number,
+        target: object,
+        containerPath: unknown[],
         operation: ModelMutation<T>['operation'],
         path: unknown[],
         oldValue: unknown,
         newValue: unknown
     ): void {
-        if (generation !== this.#generation) {return;}
+        if (!this.isAttachedAtPath(target, containerPath, generation)) {return;}
         const state = this.get();
         const mutation: ModelMutation<T> = Object.freeze({
             operation,
@@ -213,14 +237,14 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 const oldValue = this.toRaw(Reflect.get(target, property, target));
                 if (Object.is(oldValue, rawNextValue)) {return true;}
                 const applied = Reflect.set(target, property, rawNextValue, target);
-                if (applied) {this.notifyMutation(generation, 'set', path.concat(property), oldValue, rawNextValue);}
+                if (applied) {this.notifyMutation(generation, target, path, 'set', path.concat(property), oldValue, rawNextValue);}
                 return applied;
             },
             deleteProperty: (target, property) => {
                 if (!Object.prototype.hasOwnProperty.call(target, property)) {return true;}
                 const oldValue = this.toRaw(Reflect.get(target, property, target));
                 const removed = Reflect.deleteProperty(target, property);
-                if (removed) {this.notifyMutation(generation, 'delete', path.concat(property), oldValue, undefined);}
+                if (removed) {this.notifyMutation(generation, target, path, 'delete', path.concat(property), oldValue, undefined);}
                 return removed;
             }
         });
@@ -253,7 +277,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         if (hadKey && Object.is(oldValue, rawNextValue)) {return proxy;}
                         childCache.delete(key);
                         target.set(key, rawNextValue);
-                        this.notifyMutation(generation, 'set', path.concat(key), oldValue, rawNextValue);
+                        this.notifyMutation(generation, target, path, 'set', path.concat(key), oldValue, rawNextValue);
                         return proxy;
                     };
                 }
@@ -264,7 +288,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         const removed = target.delete(key);
                         if (removed) {
                             childCache.delete(key);
-                            this.notifyMutation(generation, 'delete', path.concat(key), oldValue, undefined);
+                            this.notifyMutation(generation, target, path, 'delete', path.concat(key), oldValue, undefined);
                         }
                         return removed;
                     };
@@ -275,7 +299,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         const oldValue = new Map(target);
                         target.clear();
                         childCache.clear();
-                        this.notifyMutation(generation, 'clear', path, oldValue, target);
+                        this.notifyMutation(generation, target, path, 'clear', path, oldValue, target);
                     };
                 }
                 if (property === 'forEach') {
