@@ -70,6 +70,43 @@ describe('Model deep mutation tracking', function() {
         ]);
     });
 
+    it('does not emit from a nested proxy after its path is replaced', function() {
+        const model = new Model({profile: {name: 'Ada'}});
+        const changes = mock.fn();
+        const mutations = mock.fn();
+        model.addEventListener('change', changes);
+        model.addEventListener('mutate', event => mutations(event.detail));
+
+        const detached = model.get().profile;
+        model.get().profile = {name: 'Grace'};
+        changes.mock.resetCalls();
+        mutations.mock.resetCalls();
+
+        detached.name = 'Detached';
+
+        assert.equal(model.get().profile.name, 'Grace');
+        assert.equal(detached.name, 'Detached');
+        assert.equal(changes.mock.callCount(), 0);
+        assert.equal(mutations.mock.callCount(), 0);
+    });
+
+    it('silences stale array-item proxies after reindexing and reports fresh paths correctly', function() {
+        const model = new Model({items: [{name: 'Ada'}, {name: 'Grace'}]});
+        const mutations = [];
+        model.addEventListener('mutate', event => mutations.push(event.detail));
+
+        const moved = model.get().items[1];
+        model.get().items.shift();
+        mutations.length = 0;
+
+        moved.name = 'Grace Hopper';
+        assert.equal(mutations.length, 0);
+
+        model.get().items[0].name = 'Rear Admiral Hopper';
+        assert.equal(mutations.length, 1);
+        assert.deepEqual(mutations[0].path, ['items', '0', 'name']);
+    });
+
     it('returns a stable proxy for repeated reads through the same parent', function() {
         const model = new Model({user: {profile: {name: 'Ada'}}});
 
