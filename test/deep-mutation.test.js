@@ -220,6 +220,32 @@ describe('Model deep mutation tracking', function() {
         assert.equal(mutations[0].path[2], 'active');
     });
 
+    it('keeps unaffected root-array proxies active when explicit deletion reindexes later items', function() {
+        const metadata = Symbol('metadata');
+        const model = new Model([{name: 'Ada'}, {name: 'Grace'}, {name: 'Katherine'}]);
+        model.get()[metadata] = {active: true};
+
+        const first = model.get(0);
+        const removed = model.get(1);
+        const metadataProxy = model.get()[metadata];
+        const mutations = [];
+        model.addEventListener('mutate', event => mutations.push(event.detail));
+
+        assert.equal(model.delete(1), true);
+        mutations.length = 0;
+
+        removed.name = 'Detached';
+        assert.equal(mutations.length, 0);
+
+        first.name = 'Ada Lovelace';
+        metadataProxy.active = false;
+
+        assert.equal(mutations.length, 2);
+        assert.deepEqual(mutations[0].path, ['0', 'name']);
+        assert.equal(mutations[1].path[0], metadata);
+        assert.equal(mutations[1].path[1], 'active');
+    });
+
     it('returns a stable proxy for repeated reads through the same parent', function() {
         const model = new Model({user: {profile: {name: 'Ada'}}});
 
