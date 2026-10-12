@@ -6,6 +6,10 @@ One observable Model for plain-object, array, or Map state with mutation events 
 
 Verified against `package.json`, `README.md`, and `.github/workflows/security.yml` on September 13, 2026. Recheck those files when commands or supported environments change.
 
+## Response style
+
+The owner requires concise, neutral, evidence-based responses (October 12, 2026). Do not add personality, enthusiasm, flattery or filler.
+
 ## Code map
 
 `src/` contains implementation TypeScript; `test/` holds Node tests; `tsconfig.consumer.json` checks consumer types; `dist/index.js` and `dist/index.d.ts` are package entry points.
