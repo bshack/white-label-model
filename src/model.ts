@@ -1,9 +1,17 @@
-/** @module src/model */
+/**
+ * The Model implementation. State is wrapped in lazily created proxies so that writes anywhere in the
+ * tree can be reported with their path, without ever scanning or diffing the whole state.
+ * @module src/model
+ */
 
-/** Supported root-state containers. */
+/** The state shapes a Model can hold: a plain object, an array, or a Map. */
 type ModelData = Record<PropertyKey, unknown> | unknown[] | Map<unknown, unknown>;
 
-/** One observed container plus the parent link used to rebase it without scanning the whole tree. */
+/**
+ * Bookkeeping for one proxied container. `path` is where it was found when first read; `parent` and `key`
+ * let a stale proxy find its current location by walking back up, instead of searching the whole state.
+ * `active` turns false when the container is moved or replaced in its parent.
+ */
 type ObservationContext = {
     active: boolean;
     readonly generation: number;
@@ -12,13 +20,15 @@ type ObservationContext = {
     readonly key: unknown;
     readonly parent: ObservationContext | undefined;
 };
+/** Per-container cache of child proxies, keyed by property name or Map key. */
 type ObservedChildCache = Map<unknown, {proxy: object; context: ObservationContext}>;
 
+/** Anything that can receive relayed events, such as a white-label-mediator instance or a plain EventTarget. */
 interface ApplicationMediator {
     dispatchEvent(event: Event): boolean;
 }
 
-/** Property-level mutation details emitted by deeply observable model state. */
+/** The `detail` of a `mutate` event, describing one direct write to nested state. */
 interface ModelMutation<T extends ModelData> {
     operation: 'set' | 'delete' | 'clear';
     path: ReadonlyArray<unknown>;
@@ -27,19 +37,19 @@ interface ModelMutation<T extends ModelData> {
     state: T;
 }
 
-/** Map brand checks never change for one object, so cache them instead of re-throwing on every read. */
+/** Cached results of the Map check below. An object's Map-ness never changes, and the check is slow when it fails. */
 const mapBrands = new WeakMap<object, boolean>();
 
-/** Raw targets for every Model proxy, shared so one Model never stores another Model's proxy as raw state. */
+/** Maps every Model proxy to the raw object behind it. Shared by all Models so any Model can unwrap any other's proxies. */
 const proxyTargets = new WeakMap<object, object>();
 
-/** Keys rejected by merges and direct writes to prevent prototype pollution. */
+/** Keys that merges and direct writes refuse, so state can never be used to alter object prototypes. */
 const blockedKeys = new Set<PropertyKey>(['__proto__', 'constructor', 'prototype']);
 
-/** Sentinel for a child that is no longer stored in its observed parent. */
+/** Returned by the lookup helpers when a child is not stored in the parent. */
 const missingKey = Symbol('missing');
 
-/** Recognize native Map objects, including Maps created in another realm. */
+/** Return whether a value is a real Map, including one from another realm (iframe or `vm` context). */
 function isMap(value: unknown): value is Map<unknown, unknown> {
     if (!value || typeof value !== 'object') {return false;}
     let brand = mapBrands.get(value);
@@ -55,7 +65,10 @@ function isMap(value: unknown): value is Map<unknown, unknown> {
     return brand;
 }
 
-/** Accept ordinary objects and objects with a null prototype, including ordinary objects from another realm. */
+/**
+ * Return whether a value is a plain object: an object literal, a null-prototype object, or an object
+ * literal from another realm. Class instances, Dates, and other built-ins are rejected.
+ */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
     if (Object.prototype.toString.call(value) !== '[object Object]') {return false;}
     const prototype = Object.getPrototypeOf(value);
@@ -67,18 +80,18 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
         Function.prototype.toString.call(constructor) === Function.prototype.toString.call(Object);
 }
 
-/** Return the raw target behind any Model proxy. */
+/** Return the raw object behind a Model proxy, or the value itself when it is not one. */
 function toRawValue(value: unknown): unknown {
     if (value !== null && typeof value === 'object') {return proxyTargets.get(value) || value;}
     return value;
 }
 
-/** Return whether a key would let a write reach prototype machinery. */
+/** Return whether a key is one of the blocked prototype-related keys. */
 function isBlockedKey(property: unknown): boolean {
     return typeof property === 'string' && blockedKeys.has(property);
 }
 
-/** Return the enumerable, non-blocked own entries of merge input, with Model proxies unwrapped. */
+/** List the enumerable own keys and values to merge from an object, skipping blocked keys and unwrapping proxies. */
 function mergeEntries(source: object): Array<[PropertyKey, unknown]> {
     const entries: Array<[PropertyKey, unknown]> = [];
     for (const key of Reflect.ownKeys(source)) {
@@ -89,7 +102,7 @@ function mergeEntries(source: object): Array<[PropertyKey, unknown]> {
     return entries;
 }
 
-/** Create a shallow merge using enumerable own properties while blocking prototype-pollution keys. */
+/** Return a new object with the first object's prototype, holding a shallow merge of both objects' entries. */
 function extend(
     object1: Record<string, unknown>,
     object2: Record<string, unknown>
@@ -100,7 +113,10 @@ function extend(
     return result as Record<string, unknown>;
 }
 
-/** Clone an object state exactly without invoking inherited property setters. */
+/**
+ * Copy an object's own properties, descriptors, prototype, and extensibility, without calling any setters.
+ * Used to give the validator a candidate state without touching the real one.
+ */
 function cloneObjectState(value: object): Record<PropertyKey, unknown> {
     const clone = Object.create(
         Object.getPrototypeOf(value),
@@ -111,8 +127,10 @@ function cloneObjectState(value: object): Record<PropertyKey, unknown> {
 }
 
 /**
- * Describe how update() writes one merged key in place. Merges store data and never run state
- * setters; non-writable data, non-configurable accessors, and new keys on non-extensible state reject.
+ * Work out the property descriptor update() should use to write one merged key into the root.
+ * Values are always stored as plain data, so existing setters never run.
+ * @returns The descriptor to define, or `undefined` when the key cannot be written: a read-only data
+ * property, a non-configurable accessor, or a new key on an object that cannot gain properties.
  */
 function mergeDescriptor(target: object, key: PropertyKey, value: unknown): PropertyDescriptor | undefined {
     const current = Reflect.getOwnPropertyDescriptor(target, key);
@@ -125,13 +143,17 @@ function mergeDescriptor(target: object, key: PropertyKey, value: unknown): Prop
         : undefined;
 }
 
-/** Return the raw value of an own data property without invoking accessors. */
+/** Read an own data property without running getters. Returns `missingKey` for accessors and absent keys. */
 function ownDataValue(container: object, key: PropertyKey): unknown {
     const descriptor = Reflect.getOwnPropertyDescriptor(container, key);
     return descriptor && 'value' in descriptor ? toRawValue(descriptor.value) : missingKey;
 }
 
-/** Find which key of one raw parent currently stores a child, checking its last known key first. */
+/**
+ * Find the key under which a parent currently stores a child object. Tries the last known key first,
+ * then the parent's other keys. Only this one parent is searched, never its descendants.
+ * @returns The key, or `missingKey` when the parent no longer holds the child.
+ */
 function findChildKey(container: object, hint: unknown, child: object): unknown {
     if (isMap(container)) {
         if (container.has(hint) && toRawValue(container.get(hint)) === child) {return hint;}
@@ -147,20 +169,32 @@ function findChildKey(container: object, hint: unknown, child: object): unknown 
     return missingKey;
 }
 
-/** Mutable object, array, or Map state with synchronous change notifications. */
+/**
+ * Observable state for a plain object, array, or Map. Every change is applied synchronously and announced
+ * with `CustomEvent`s whose `detail` carries the state (or, for `mutate`, a description of the write).
+ */
 class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
+    /** The observable root state. Prefer `get()` for reading it. */
     modelData: T;
+    /** Optional check run on the complete proposed state before explicit mutations commit. */
     validator: ((data: unknown) => boolean) | undefined;
+    /** Name used in relayed event types (`model:<name>:<event>`). Relays need both `name` and `mediator`. */
     name: string | false = false;
+    /** Optional event target that receives a namespaced copy of every Model event. */
     mediator: ApplicationMediator | false = false;
+    /** Child proxy cache of the current root, so explicit mutations can invalidate the entries they replace. */
     #rootChildCache!: ObservedChildCache;
+    /** Increments whenever the root object is replaced; proxies from older generations stay silent. */
     #generation = 0;
+    /** Aborting this removes every listener; destroy() aborts it and starts a fresh one. */
     #listenerController = new AbortController();
 
     /**
-     * Create one observable state container for a plain object, array, or Map.
-     * @param modelData - Initial state; omitted state defaults to an empty object.
-     * @param validator - Optional whole-state validator for explicit set/update/push/delete operations.
+     * Create a Model holding a plain object, array, or Map.
+     * @param modelData - Initial state. Defaults to an empty object. A Model proxy is unwrapped first.
+     * @param validator - Optional function that receives the complete proposed state and returns `false`
+     * to reject it. Runs on construction and before `set()`, `update()`, `push()`, and `delete()` commit.
+     * @throws TypeError when the data is not a supported shape or the validator rejects it.
      */
     constructor(modelData?: T, validator?: (data: unknown) => boolean) {
         super();
@@ -175,7 +209,10 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         this.modelData = this.#observeRoot(initial) as T;
     }
 
-    /** Register a native listener owned by this Model lifecycle. */
+    /**
+     * Add a listener using native EventTarget rules. The listener is also tied to this Model's lifecycle,
+     * so `destroy()` removes it; a caller-supplied `signal` still works alongside that.
+     */
     override addEventListener(
         type: string,
         callback: EventListenerOrEventListenerObject | null,
@@ -188,7 +225,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         super.addEventListener(type, callback, {...settings, signal});
     }
 
-    /** Normalize capture removal so supported Node runtimes match browser EventTarget behavior. */
+    /** Remove a listener. Only `capture` is passed on, so Node.js matches browser removal behavior. */
     override removeEventListener(
         type: string,
         callback: EventListenerOrEventListenerObject | null,
@@ -198,10 +235,16 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         super.removeEventListener(type, callback, {capture});
     }
 
-    /** Start this instance and return it for lifecycle chaining. */
+    /**
+     * Lifecycle hook kept for consistency with other White Label packages. It does nothing.
+     * @returns This Model, for chaining.
+     */
     initialize() {return this;}
 
-    /** Release owned state and listeners so the instance can leave the application lifecycle. */
+    /**
+     * Clear the state without events and remove every listener. The instance can be used again afterwards.
+     * @returns This Model, for chaining.
+     */
     destroy() {
         this.clear(true);
         this.#listenerController.abort();
@@ -209,7 +252,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return this;
     }
 
-    /** Dispatch local CustomEvents and optional namespaced mediator relays. */
+    /** Dispatch each event locally, then relay it to the mediator as `model:<name>:<event>` when one is set. */
     #dispatchMessages(messages: string[], data: unknown): void {
         for (const message of messages) {
             this.dispatchEvent(new CustomEvent(message, {detail: data}));
@@ -219,26 +262,26 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         }
     }
 
-    /** Return the raw target behind an observable proxy. */
+    /** Return the raw object behind a Model proxy. */
     private toRaw(value: unknown): unknown {return toRawValue(value);}
 
-    /** Return whether a value is a supported root-state container. */
+    /** Return whether a value is a plain object, array, or Map. */
     private isSupportedData(value: unknown): value is ModelData {
         return Array.isArray(value) || isPlainObject(value) || isMap(value);
     }
 
-    /** Return whether a nested value should participate in deep change tracking. */
+    /** Return whether a nested value should be wrapped in a proxy. */
     private isObservable(value: unknown): value is ModelData {
         return value !== null && typeof value === 'object' && this.isSupportedData(value);
     }
 
-    /** Return the raw root container. */
+    /** Return the raw (unproxied) root state. */
     private rawState(): ModelData {return this.toRaw(this.modelData) as ModelData;}
 
-    /** Apply the optional validator to an explicit candidate state. */
+    /** Return whether the validator accepts a candidate state, or `true` when there is no validator. */
     private accepts(candidate: ModelData): boolean {return !this.validator || this.validator(candidate);}
 
-    /** Return whether this same-generation proxy and every observed ancestor still represent current state. */
+    /** Return whether this container and all of its ancestors are still where they were first read. */
     private isObservationActive(context: ObservationContext): boolean {
         for (let current: ObservationContext | undefined = context; current; current = current.parent) {
             if (!current.active) {return false;}
@@ -246,7 +289,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return true;
     }
 
-    /** Invalidate one cached child proxy while allowing retained detached objects to remain usable. */
+    /** Forget one cached child proxy and mark it stale. Code holding that proxy can still use it. */
     private invalidateObservedChild(cache: ObservedChildCache, key: unknown): void {
         const cached = cache.get(key);
         if (!cached) {return;}
@@ -254,7 +297,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         cache.delete(key);
     }
 
-    /** Invalidate cached array items whose index changes after a structural mutation. */
+    /** Mark cached array items at or after `index` stale, because their positions changed. */
     private invalidateObservedArrayFrom(cache: ObservedChildCache, index: number): void {
         for (const [key, cached] of cache) {
             const numericKey = typeof key === 'string' && key !== '' ? Number(key) : Number.NaN;
@@ -265,7 +308,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         }
     }
 
-    /** Invalidate the cached child for one written property, or every truncated index for an array length write. */
+    /** After a write, mark the overwritten child stale; for an array `length` write, mark every removed index stale. */
     #invalidateWrittenProperty(cache: ObservedChildCache, target: object, property: PropertyKey, oldLength: number): void {
         if (Array.isArray(target) && property === 'length') {
             if (target.length < oldLength) {this.invalidateObservedArrayFrom(cache, target.length);}
@@ -275,13 +318,16 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     }
 
     /**
-     * Rebase a stale container through its observed ancestors only: each level checks the parent's last
-     * known key, then that parent's own entries, so work is bounded by depth rather than model size.
+     * Find where a container lives in the current state. Active containers use their recorded path. A stale
+     * one first locates its parent the same way, then looks for itself in that parent, so the cost grows
+     * with depth rather than state size. If an ancestor was replaced by another object, this returns null
+     * even when the container is reachable some other way: an accepted trade-off for avoiding tree scans.
+     * @returns The current path, or null when the container is no longer reachable through its parents.
      */
     private findCurrentPath(context: ObservationContext): unknown[] | null {
         if (this.isObservationActive(context)) {return context.path;}
         if (context.target === this.rawState()) {return [];}
-        // The root context is always active in the current generation, so a stale context has a parent.
+        // Only non-root contexts are ever marked stale, so a stale context always has a parent.
         const parent = context.parent!;
         const parentPath = this.findCurrentPath(parent);
         if (!parentPath) {return null;}
@@ -289,13 +335,13 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return key === missingKey ? null : [...parentPath, key];
     }
 
-    /** Resolve the live container path, or null when the proxy is detached from the current root. */
+    /** Return the container's current path, or null when its proxy belongs to an old root or is unreachable. */
     private resolveMutationPath(context: ObservationContext): unknown[] | null {
         if (context.generation !== this.#generation) {return null;}
         return this.findCurrentPath(context);
     }
 
-    /** Dispatch deep-mutation events only while the proxy still maps to current state. */
+    /** Dispatch `change` and `mutate` for a direct write, unless the written container is detached. */
     private notifyMutation(
         context: ObservationContext,
         operation: ModelMutation<T>['operation'],
@@ -317,7 +363,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         this.#dispatchMessages(['mutate'], mutation);
     }
 
-    /** Return the cached proxy for one child, creating it lazily when the child is observable. */
+    /** Return the proxy for a child value, reusing the cached one or creating it on first access. */
     #observeChild(cache: ObservedChildCache, context: ObservationContext, key: unknown, value: object): unknown {
         const raw = toRawValue(value) as object;
         const cached = cache.get(key);
@@ -336,7 +382,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return proxy;
     }
 
-    /** Observe plain objects and arrays lazily along accessed branches. */
+    /** Wrap a plain object or array in a proxy that reports writes and wraps children as they are read. */
     private observeObject(value: object, context: ObservationContext): object {
         const childCache: ObservedChildCache = new Map();
         if (!context.parent) {this.#rootChildCache = childCache;}
@@ -349,7 +395,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                     ? descriptor.value
                     : Reflect.get(target, property, receiver);
                 if (result === null || typeof result !== 'object') {return result;}
-                // Proxy invariants require frozen (non-configurable, non-writable) data to be returned as stored.
+                // A Proxy must return non-configurable, non-writable values unchanged, so these are not wrapped.
                 if (descriptor && descriptor.configurable === false && descriptor.writable === false) {return result;}
                 return this.#observeChild(childCache, context, property, result);
             },
@@ -373,7 +419,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 const next = 'value' in descriptor ? {...descriptor, value: toRawValue(descriptor.value)} : descriptor;
                 const oldLength = isArray ? (target as unknown[]).length : 0;
                 if (!Reflect.defineProperty(target, property, next)) {return false;}
-                // Attribute changes such as freezing must also drop the cached child proxy.
+                // Even attribute-only changes (such as freezing) drop the cached child, so the next read sees them.
                 this.#invalidateWrittenProperty(childCache, target, property, oldLength);
                 const current = Reflect.getOwnPropertyDescriptor(target, property)!;
                 const changed = !previous || !Object.is(previous.value, current.value) ||
@@ -399,14 +445,14 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 }
                 return removed;
             },
-            // Replacing a state prototype would bypass the __proto__ write protection.
+            // Allow only a no-op; changing the prototype would bypass the blocked-key protection.
             setPrototypeOf: (target, prototype) => Reflect.getPrototypeOf(target) === prototype
         });
         proxyTargets.set(proxy, value);
         return proxy;
     }
 
-    /** Observe Map values and mutators without scanning unrelated entries. */
+    /** Wrap a Map in a proxy whose mutators report changes and whose readers wrap values as they are read. */
     private observeMap(value: Map<unknown, unknown>, context: ObservationContext): Map<unknown, unknown> {
         const childCache: ObservedChildCache = new Map();
         if (!context.parent) {this.#rootChildCache = childCache;}
@@ -472,15 +518,15 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return proxy;
     }
 
-    /** Wrap one supported container lazily so mutations never require a full-tree scan. */
+    /** Wrap a supported container in the matching kind of proxy. */
     private observe(value: ModelData, context: ObservationContext): object {
-        // Check the cheap object shapes first: a failed Map brand check throws, which is slow on fresh objects.
+        // Check arrays and plain objects first: the Map check throws on non-Maps, which is slow for new objects.
         return Array.isArray(value) || isPlainObject(value)
             ? this.observeObject(value, context)
             : this.observeMap(value as Map<unknown, unknown>, context);
     }
 
-    /** Observe a new root container for a new state generation. */
+    /** Wrap a new root in a proxy tied to the current generation. */
     #observeRoot(value: ModelData): object {
         return this.observe(value, {
             active: true,
@@ -492,7 +538,12 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         });
     }
 
-    /** Replace all model state. */
+    /**
+     * Replace the whole state. Proxies from the old root stop emitting events.
+     * @param data - A plain object, array, or Map. A Model proxy is unwrapped first.
+     * @param silent - When `true`, skip the `change` and `set` events.
+     * @returns `true` when applied, or `false` when the data is unsupported or rejected by the validator.
+     */
     set(data: unknown, silent = false): boolean {
         const rawData = this.toRaw(data);
         if (!this.isSupportedData(rawData) || !this.accepts(rawData)) {return false;}
@@ -504,7 +555,11 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
 
     get(): T;
     get(key: unknown): unknown;
-    /** Return all state or one object property, array index, or Map entry. */
+    /**
+     * Read the whole state, or one entry of it.
+     * @param key - Optional object property, array index (integer), or Map key.
+     * @returns The observable root when called without a key; otherwise the entry, or `undefined` when missing.
+     */
     get(key?: unknown): unknown {
         if (arguments.length === 0) {return this.modelData;}
         const raw = this.rawState();
@@ -516,7 +571,19 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return undefined;
     }
 
-    /** Shallow-merge an object root in place, or replace/merge one existing array or Map member. */
+    /**
+     * Change part of the state.
+     *
+     * Object root: `update(data, silent?)` shallow-merges `data` into the root in place, so retained proxies
+     * keep working. Returns `false` with nothing changed if any merged key is read-only or would be new on
+     * a root that cannot gain properties.
+     *
+     * Array or Map root: `update(key, value, silent?)` replaces one existing member. When both the current
+     * and new values are plain objects, they are shallow-merged into a new object instead.
+     *
+     * Blocked keys (`__proto__`, `constructor`, `prototype`) are never merged.
+     * @returns `true` when applied, or `false` for bad arguments, a missing member, or a validator rejection.
+     */
     update(keyOrData: unknown, dataOrSilent?: unknown, silent = false): boolean {
         const raw = this.rawState();
         if (isPlainObject(raw)) {
@@ -533,7 +600,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 for (const [key, descriptor] of writes) {Object.defineProperty(candidate, key, descriptor);}
                 if (!this.accepts(candidate)) {return false;}
             }
-            // Mutating the root in place keeps retained root and nested proxies attached to current state.
+            // Write into the existing root rather than replacing it, so proxies already handed out stay live.
             for (const [key, descriptor] of writes) {
                 if (ownDataValue(raw, key) !== descriptor.value) {this.invalidateObservedChild(this.#rootChildCache, key);}
                 Object.defineProperty(raw, key, descriptor);
@@ -571,7 +638,13 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return true;
     }
 
-    /** Append array values or insert Map entries. Returns false for plain-object state. */
+    /**
+     * Add to the state.
+     *
+     * Array root: `push(value, silent?)` appends one value; `push([a, b], silent?)` appends each item.
+     * Map root: `push(key, value, silent?)` sets one entry; `push(map, silent?)` sets every entry of `map`.
+     * @returns `true` when applied, or `false` for an object root, bad arguments, or a validator rejection.
+     */
     push(key: unknown, dataOrSilent?: unknown, silent = false): boolean {
         const raw = this.rawState();
         if (Array.isArray(raw)) {
@@ -614,7 +687,12 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return true;
     }
 
-    /** Delete one property, array index, or Map entry. Use clear() to empty all state. */
+    /**
+     * Remove one object property, array index, or Map entry. Later array items shift down by one.
+     * @param key - The property, index, or Map key to remove.
+     * @param silent - When `true`, skip the `change` and `delete` events.
+     * @returns `true` when removed, or `false` when the key is missing, cannot be deleted, or is rejected.
+     */
     delete(key: unknown, silent = false): boolean {
         const raw = this.rawState();
         const isMapState = isMap(raw);
@@ -657,7 +735,12 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return true;
     }
 
-    /** Clear all state while preserving its object, array, or Map shape (including an object's prototype). */
+    /**
+     * Replace the state with an empty value of the same shape: an object with the same prototype, an empty
+     * array, or an empty Map. Skips the validator. Proxies from the old root stop emitting events.
+     * @param silent - When `true`, skip the `change` and `clear` events.
+     * @returns Always `true`.
+     */
     clear(silent = false): boolean {
         const raw = this.rawState();
         const empty: ModelData = isMap(raw)

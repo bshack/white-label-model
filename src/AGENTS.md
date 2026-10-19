@@ -13,7 +13,11 @@ These instructions are more specific than the repository-root agent guide for fi
 - Deep observation must remain lazy and path-based. Do not add whole-tree scans or diffs for ordinary nested mutations.
 - A proxy retained from a replaced/cleared/destroyed root may still mutate that detached object, but it must never publish events as if it belonged to the current Model root.
 - Keep runtime validation separate from TypeScript types. Direct nested writes are observable but intentionally do not run the whole-state validator; explicit mutation methods do.
-- Preserve prototype-pollution protections for `__proto__`, `constructor`, and `prototype` paths.
+- Preserve prototype-pollution protections for `__proto__`, `constructor`, and `prototype` paths, including the object/array `defineProperty` and `setPrototypeOf` traps.
+- Object-root `update()` mutates the root in place (no new generation, validator runs once on a clone) and returns `false` with no partial change when a merged key is read-only or new on a non-extensible root. `clear()` keeps the object root's prototype, including `null`.
+- Stale-proxy re-pathing walks the `ObservationContext` parent chain, checking each parent's last known key then that parent's own entries: O(depth), never a tree scan. Accepted trade-off: a proxy under an ancestor replaced by a different object stays silent.
+- Values in non-writable, non-configurable properties are returned unwrapped (Proxy invariant). Object proxies return `undefined` for keys that are not own properties.
+- Unwrap any Model proxy (from any Model, via the module-level `proxyTargets` WeakMap) before storing a value.
 
 ## Verification
 

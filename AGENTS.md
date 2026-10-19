@@ -2,15 +2,20 @@
 
 One observable Model for plain-object, array, or Map state with mutation events and optional validation.
 
-Verified against `package.json`, `README.md`, and `.github/workflows/security.yml` on September 13, 2026. Recheck those files when commands or supported environments change.
+Verified against `package.json`, `README.md`, `src/`, and `.github/workflows/security.yml` on October 19, 2026. Recheck those files when commands or supported environments change.
 
 ## Code map
 
-`src/` contains implementation TypeScript (see `src/AGENTS.md`); `test/` holds Node tests; `tsconfig.consumer.json` and `tsconfig.browser-consumer.json` check consumer types; `dist/index.js` and `dist/index.d.ts` are the package entry points.
+- `src/model.ts`: the `Model` class (state API, lazy proxies, event dispatch). See `src/AGENTS.md`.
+- `src/index.ts`: public entry; re-exports `Model` with typed event-listener signatures. Declarations are the public type surface.
+- `test/`: Node tests (`*.test.js`) plus `test/browser-smoke.js`; `test-types/` with `tsconfig.consumer.json` and `tsconfig.browser-consumer.json` check consumer types.
+- `benchmark/model.bench.js`: `npm run benchmark` timings (not part of the gate).
+- `docs/events-compatibility.md`: the EventTarget contract the tests protect.
+- `dist/index.js`, `dist/index.d.ts`: compiled package entry points (tracked, generated).
 
 ## Toolchain
 
-Node.js `^22.18.0 || >=24.11.0` (CI uses Node 24) and npm >=11.0. Run everything from the repository root. Install once:
+Node.js `^22.18.0 || >=24.11.0` (CI runs the gate on Node 24.21.0 and `npm test` on 22.18.0) and npm >=11.0. Run everything from the repository root. Install once:
 
 ```sh
 npm ci --ignore-scripts
