@@ -17,4 +17,4 @@ These instructions are more specific than the repository-root agent guide for fi
 
 ## Verification
 
-Run the repository’s full lint, type, runtime, 100% per-file coverage, audit, packed-package, package-manager, and supported-Node checks before treating a source change as release-ready. Do not weaken coverage or public-contract assertions to accommodate an implementation change.
+Run the root full gate. A source change is release-ready only once CI's packed-package, package-manager, and supported-Node checks also pass. Never weaken coverage or public-contract assertions to accommodate an implementation change.
