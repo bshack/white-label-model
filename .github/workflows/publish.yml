@@ -41,14 +41,13 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
+      # coverage builds (which typechecks), checks consumer types, and runs every test,
+      # so separate build, typecheck, and test steps would repeat the same work.
       - run: npm run coverage
       - run: npm run audit
-      - run: npm run build
-      - run: npm pack --dry-run --ignore-scripts
+      # Packs the dist built by coverage; npm pack lists the packed files.
       - name: Create release package
-        run: npm pack --silent --ignore-scripts
+        run: npm pack --ignore-scripts
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-package

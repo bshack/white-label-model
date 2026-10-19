@@ -1,4 +1,4 @@
-// Bundle this file for a browser; see docs/events-compatibility.md.
+// Bundle this file for a browser; see docs/events-compatibility.md. `npm run test:unit` also runs it in Node.
 const {Model} = require('..');
 const instances = [new Model(), new Model([]), new Model(new Map())];
 const assert = (value, message) => { if (!value) throw new Error(message); };

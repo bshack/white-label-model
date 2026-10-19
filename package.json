@@ -24,7 +24,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \"src/**/*.ts\" --max-warnings=0",
     "lint:fix": "node --run lint -- --fix",
-    "test:unit": "node --test test/*.test.js",
+    "test:unit": "node --test test/*.test.js test/browser-smoke.js",
     "coverage": "node --run build && node --run test:types && node --run test:browser-types && c8 node --run test:unit",
     "prepare": "node --run build",
     "test:types": "tsc -p tsconfig.consumer.json",

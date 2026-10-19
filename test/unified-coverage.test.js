@@ -23,11 +23,14 @@ test('observable Map exposes native reads, iteration, callbacks, and mutations',
     assert.equal(mutations.at(-1).path[1], 'name');
 
     const visited = [];
-    map.forEach((value, key, receivedMap) => {
-        visited.push([key, value]);
+    const thisArg = {};
+    map.forEach(function(value, key, receivedMap) {
+        visited.push([key, value, this]);
         assert.equal(receivedMap, map);
-    });
+    }, thisArg);
     assert.equal(visited.length, 2);
+    assert.equal(visited[0][1], map.get('object'));
+    assert.equal(visited[0][2], thisArg);
 
     const values = [...map.values()];
     assert.equal(values.length, 2);
