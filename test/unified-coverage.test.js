@@ -62,12 +62,18 @@ test('Map nested proxy cache refreshes when a key receives a different object', 
     assert.equal(second.name, 'Grace');
 });
 
-test('object update reports rejection if a stateful validator changes between checks', () => {
+test('object update runs the validator once and leaves state unchanged on rejection', () => {
     let checks = 0;
+    let accept = true;
     const model = new Model({name: 'Ada'}, () => {
         checks += 1;
-        return checks !== 3;
+        return accept;
     });
-    assert.equal(model.update({name: 'Grace'}), false);
-    assert.equal(model.get().name, 'Ada');
+    checks = 0;
+    assert.equal(model.update({name: 'Grace'}), true);
+    assert.equal(checks, 1);
+    accept = false;
+    assert.equal(model.update({name: 'Lin'}), false);
+    assert.equal(checks, 2);
+    assert.equal(model.get().name, 'Grace');
 });

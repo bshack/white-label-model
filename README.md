@@ -126,7 +126,7 @@ people.update('ada', {name: 'Ada Lovelace'});
 
 Passing `true` as the final `silent` argument suppresses Model-generated events. Mutation methods are synchronous: their return value is available only after validation and the accepted state change have completed.
 
-`update()` shallow-merges plain objects and blocks `__proto__`, `constructor`, and `prototype` from merge input. It does not recursively merge nested objects.
+`update()` shallow-merges plain objects and blocks `__proto__`, `constructor`, and `prototype` from merge input. It does not recursively merge nested objects. On an object root it merges in place, so retained proxies stay attached and untouched properties keep their descriptors; it returns `false` without changing state when a merged key is read-only or the root cannot gain a new key.
 
 ## Events
 
@@ -187,7 +187,7 @@ Observation is path-based: accessing a branch creates proxies for that branch, a
 
 When `set()`, `clear()`, or `destroy()` replaces the root, previously retained proxies still refer to old JavaScript objects but are detached from the Model lifecycle. Mutating those detached proxies does not dispatch current Model events or change the current root.
 
-When a retained proxy becomes stale because an array item moved or one alias was replaced, Model checks whether that raw object is still reachable through the current root. If it remains live, `mutate.detail.path` is reported using a current path; if it is no longer reachable, the proxy remains detached and silent. Shared-reference graphs and circular references are supported.
+When a retained proxy becomes stale because an array item moved or one alias was replaced, Model rechecks only the containers that proxy was reached through: it looks for the raw object under another key of the same parent, and rebases that parent the same way. If it remains live, `mutate.detail.path` is reported using a current path; if its observed parent chain no longer reaches the current root, the proxy remains detached and silent. This check never scans unrelated state. Shared-reference graphs and circular references are supported.
 
 Direct writes to `__proto__`, `constructor`, and `prototype` are rejected.
 

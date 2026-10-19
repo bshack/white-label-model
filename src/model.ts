@@ -3,8 +3,16 @@
 /** Supported root-state containers. */
 type ModelData = Record<PropertyKey, unknown> | unknown[] | Map<unknown, unknown>;
 
-type ObservationToken = {active: boolean; parent?: ObservationToken};
-type ObservedChildCache = Map<unknown, {raw: object; proxy: object; token: ObservationToken}>;
+/** One observed container plus the parent link used to rebase it without scanning the whole tree. */
+type ObservationContext = {
+    active: boolean;
+    readonly generation: number;
+    readonly target: object;
+    readonly path: unknown[];
+    readonly key: unknown;
+    readonly parent: ObservationContext | undefined;
+};
+type ObservedChildCache = Map<unknown, {proxy: object; context: ObservationContext}>;
 
 interface ApplicationMediator {
     dispatchEvent(event: Event): boolean;
@@ -19,27 +27,66 @@ interface ModelMutation<T extends ModelData> {
     state: T;
 }
 
+/** Map brand checks never change for one object, so cache them instead of re-throwing on every read. */
+const mapBrands = new WeakMap<object, boolean>();
+
+/** Raw targets for every Model proxy, shared so one Model never stores another Model's proxy as raw state. */
+const proxyTargets = new WeakMap<object, object>();
+
+/** Keys rejected by merges and direct writes to prevent prototype pollution. */
+const blockedKeys = new Set<PropertyKey>(['__proto__', 'constructor', 'prototype']);
+
+/** Sentinel for a child that is no longer stored in its observed parent. */
+const missingKey = Symbol('missing');
+
 /** Recognize native Map objects, including Maps created in another realm. */
 function isMap(value: unknown): value is Map<unknown, unknown> {
     if (!value || typeof value !== 'object') {return false;}
-    try {
-        Map.prototype.has.call(value, value);
-        return true;
-    } catch {
-        return false;
+    let brand = mapBrands.get(value);
+    if (brand === undefined) {
+        try {
+            Map.prototype.has.call(value, value);
+            brand = true;
+        } catch {
+            brand = false;
+        }
+        mapBrands.set(value, brand);
     }
+    return brand;
 }
 
 /** Accept ordinary objects and objects with a null prototype, including ordinary objects from another realm. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
     if (Object.prototype.toString.call(value) !== '[object Object]') {return false;}
     const prototype = Object.getPrototypeOf(value);
-    if (prototype === null) {return true;}
+    if (prototype === null || prototype === Object.prototype) {return true;}
     const constructor = Object.prototype.hasOwnProperty.call(prototype, 'constructor')
         ? prototype.constructor
         : undefined;
     return typeof constructor === 'function' &&
         Function.prototype.toString.call(constructor) === Function.prototype.toString.call(Object);
+}
+
+/** Return the raw target behind any Model proxy. */
+function toRawValue(value: unknown): unknown {
+    if (value !== null && typeof value === 'object') {return proxyTargets.get(value) || value;}
+    return value;
+}
+
+/** Return whether a key would let a write reach prototype machinery. */
+function isBlockedKey(property: unknown): boolean {
+    return typeof property === 'string' && blockedKeys.has(property);
+}
+
+/** Return the enumerable, non-blocked own entries of merge input, with Model proxies unwrapped. */
+function mergeEntries(source: object): Array<[PropertyKey, unknown]> {
+    const entries: Array<[PropertyKey, unknown]> = [];
+    for (const key of Reflect.ownKeys(source)) {
+        if (!isBlockedKey(key) && Object.prototype.propertyIsEnumerable.call(source, key)) {
+            entries.push([key, toRawValue((source as Record<PropertyKey, unknown>)[key])]);
+        }
+    }
+    return entries;
 }
 
 /** Create a shallow merge using enumerable own properties while blocking prototype-pollution keys. */
@@ -48,24 +95,56 @@ function extend(
     object2: Record<string, unknown>
 ): Record<string, unknown> {
     const result = Object.create(Object.getPrototypeOf(object1)) as Record<PropertyKey, unknown>;
-    const blockedKeys = new Set(['__proto__', 'constructor', 'prototype']);
-    for (const source of [object1, object2]) {
-        for (const key of Reflect.ownKeys(source)) {
-            if ((typeof key !== 'string' || !blockedKeys.has(key)) &&
-                Object.prototype.propertyIsEnumerable.call(source, key)) {
-                result[key] = (source as Record<PropertyKey, unknown>)[key];
-            }
-        }
-    }
+    for (const [key, value] of mergeEntries(object1)) {result[key] = value;}
+    for (const [key, value] of mergeEntries(object2)) {result[key] = value;}
     return result as Record<string, unknown>;
 }
 
 /** Clone an object state exactly without invoking inherited property setters. */
 function cloneObjectState(value: object): Record<PropertyKey, unknown> {
-    return Object.create(
+    const clone = Object.create(
         Object.getPrototypeOf(value),
         Object.getOwnPropertyDescriptors(value)
     ) as Record<PropertyKey, unknown>;
+    if (!Object.isExtensible(value)) {Object.preventExtensions(clone);}
+    return clone;
+}
+
+/**
+ * Describe how update() writes one merged key in place. Merges store data and never run state
+ * setters; non-writable data, non-configurable accessors, and new keys on non-extensible state reject.
+ */
+function mergeDescriptor(target: object, key: PropertyKey, value: unknown): PropertyDescriptor | undefined {
+    const current = Reflect.getOwnPropertyDescriptor(target, key);
+    if (!current) {
+        return Reflect.isExtensible(target) ? {value, writable: true, enumerable: true, configurable: true} : undefined;
+    }
+    if ('value' in current) {return current.writable ? {value} : undefined;}
+    return current.configurable
+        ? {value, writable: true, enumerable: Boolean(current.enumerable), configurable: true}
+        : undefined;
+}
+
+/** Return the raw value of an own data property without invoking accessors. */
+function ownDataValue(container: object, key: PropertyKey): unknown {
+    const descriptor = Reflect.getOwnPropertyDescriptor(container, key);
+    return descriptor && 'value' in descriptor ? toRawValue(descriptor.value) : missingKey;
+}
+
+/** Find which key of one raw parent currently stores a child, checking its last known key first. */
+function findChildKey(container: object, hint: unknown, child: object): unknown {
+    if (isMap(container)) {
+        if (container.has(hint) && toRawValue(container.get(hint)) === child) {return hint;}
+        for (const [key, value] of container) {
+            if (toRawValue(value) === child) {return key;}
+        }
+        return missingKey;
+    }
+    if (!isBlockedKey(hint) && ownDataValue(container, hint as PropertyKey) === child) {return hint;}
+    for (const key of Reflect.ownKeys(container)) {
+        if (!isBlockedKey(key) && ownDataValue(container, key) === child) {return key;}
+    }
+    return missingKey;
 }
 
 /** Mutable object, array, or Map state with synchronous change notifications. */
@@ -74,7 +153,6 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     validator: ((data: unknown) => boolean) | undefined;
     name: string | false = false;
     mediator: ApplicationMediator | false = false;
-    readonly #proxyTargets = new WeakMap<object, object>();
     #rootChildCache!: ObservedChildCache;
     #generation = 0;
     #listenerController = new AbortController();
@@ -87,14 +165,14 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     constructor(modelData?: T, validator?: (data: unknown) => boolean) {
         super();
         this.validator = validator;
-        const initial = modelData === undefined ? {} : modelData;
+        const initial = modelData === undefined ? {} : toRawValue(modelData);
         if (!this.isSupportedData(initial)) {
             throw new TypeError('Model data must be a plain object, array, or Map.');
         }
         if (!this.accepts(initial)) {
             throw new TypeError('Initial model data failed validation.');
         }
-        this.modelData = this.observe(initial, [], this.#generation) as T;
+        this.modelData = this.#observeRoot(initial) as T;
     }
 
     /** Register a native listener owned by this Model lifecycle. */
@@ -141,27 +219,17 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         }
     }
 
-    /** Return the raw target behind one of this model's observable proxies. */
-    private toRaw(value: unknown): unknown {
-        if (value && typeof value === 'object') {return this.#proxyTargets.get(value) || value;}
-        return value;
-    }
+    /** Return the raw target behind an observable proxy. */
+    private toRaw(value: unknown): unknown {return toRawValue(value);}
 
     /** Return whether a value is a supported root-state container. */
     private isSupportedData(value: unknown): value is ModelData {
-        return Array.isArray(value) || isMap(value) || isPlainObject(value);
+        return Array.isArray(value) || isPlainObject(value) || isMap(value);
     }
 
     /** Return whether a nested value should participate in deep change tracking. */
     private isObservable(value: unknown): value is ModelData {
-        return value !== null && typeof value === 'object' &&
-            (Array.isArray(value) || isMap(value) || isPlainObject(value));
-    }
-
-    /** Prevent direct object writes from using prototype-pollution keys. */
-    private isBlockedKey(property: PropertyKey): boolean {
-        return typeof property === 'string' &&
-            (property === '__proto__' || property === 'constructor' || property === 'prototype');
+        return value !== null && typeof value === 'object' && this.isSupportedData(value);
     }
 
     /** Return the raw root container. */
@@ -170,10 +238,9 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     /** Apply the optional validator to an explicit candidate state. */
     private accepts(candidate: ModelData): boolean {return !this.validator || this.validator(candidate);}
 
-    /** Return whether this proxy and every observed ancestor still represent current state. */
-    private isObservationActive(generation: number, token?: ObservationToken): boolean {
-        if (generation !== this.#generation) {return false;}
-        for (let current = token; current; current = current.parent) {
+    /** Return whether this same-generation proxy and every observed ancestor still represent current state. */
+    private isObservationActive(context: ObservationContext): boolean {
+        for (let current: ObservationContext | undefined = context; current; current = current.parent) {
             if (!current.active) {return false;}
         }
         return true;
@@ -183,83 +250,65 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
     private invalidateObservedChild(cache: ObservedChildCache, key: unknown): void {
         const cached = cache.get(key);
         if (!cached) {return;}
-        cached.token.active = false;
+        cached.context.active = false;
         cache.delete(key);
     }
 
-    /** Invalidate cached array items whose index changes after a structural root mutation. */
-    private invalidateObservedArrayFrom(index: number): void {
-        for (const [key, cached] of this.#rootChildCache) {
+    /** Invalidate cached array items whose index changes after a structural mutation. */
+    private invalidateObservedArrayFrom(cache: ObservedChildCache, index: number): void {
+        for (const [key, cached] of cache) {
             const numericKey = typeof key === 'string' && key !== '' ? Number(key) : Number.NaN;
             if (Number.isInteger(numericKey) && numericKey >= index) {
-                cached.token.active = false;
-                this.#rootChildCache.delete(key);
+                cached.context.active = false;
+                cache.delete(key);
             }
         }
     }
 
-    /** Find one current state path to a raw observed container without invoking accessors. */
-    private findCurrentPath(target: object): unknown[] | null {
-        const queue: Array<{value: unknown; path: unknown[]}> = [{value: this.rawState(), path: []}];
-        const seen = new WeakSet<object>();
-
-        for (let index = 0; index < queue.length; index += 1) {
-            const entry = queue[index]!;
-            const rawValue = this.toRaw(entry.value);
-            if (rawValue === target) {return entry.path;}
-            if (!this.isObservable(rawValue) || seen.has(rawValue)) {continue;}
-            seen.add(rawValue);
-
-            if (isMap(rawValue)) {
-                for (const [key, value] of rawValue) {
-                    queue.push({value, path: entry.path.concat(key)});
-                }
-                continue;
-            }
-
-            for (const key of Reflect.ownKeys(rawValue)) {
-                if (this.isBlockedKey(key)) {continue;}
-                const descriptor = Object.getOwnPropertyDescriptor(rawValue, key);
-                if (!descriptor || !('value' in descriptor)) {continue;}
-                queue.push({value: descriptor.value, path: entry.path.concat(key)});
-            }
+    /** Invalidate the cached child for one written property, or every truncated index for an array length write. */
+    #invalidateWrittenProperty(cache: ObservedChildCache, target: object, property: PropertyKey, oldLength: number): void {
+        if (Array.isArray(target) && property === 'length') {
+            if (target.length < oldLength) {this.invalidateObservedArrayFrom(cache, target.length);}
+            return;
         }
-
-        return null;
+        this.invalidateObservedChild(cache, property);
     }
 
-    /** Resolve the live mutation path, rebasing stale same-generation aliases when possible. */
-    private resolveMutationPath(
-        generation: number,
-        token: ObservationToken | undefined,
-        target: object,
-        containerPath: unknown[],
-        mutationPath: unknown[]
-    ): unknown[] | null {
-        if (this.isObservationActive(generation, token)) {return mutationPath;}
-        if (generation !== this.#generation) {return null;}
-        const currentContainerPath = this.findCurrentPath(target);
-        if (!currentContainerPath) {return null;}
-        return currentContainerPath.concat(mutationPath.slice(containerPath.length));
+    /**
+     * Rebase a stale container through its observed ancestors only: each level checks the parent's last
+     * known key, then that parent's own entries, so work is bounded by depth rather than model size.
+     */
+    private findCurrentPath(context: ObservationContext): unknown[] | null {
+        if (this.isObservationActive(context)) {return context.path;}
+        if (context.target === this.rawState()) {return [];}
+        // The root context is always active in the current generation, so a stale context has a parent.
+        const parent = context.parent!;
+        const parentPath = this.findCurrentPath(parent);
+        if (!parentPath) {return null;}
+        const key = findChildKey(parent.target, context.key, context.target);
+        return key === missingKey ? null : [...parentPath, key];
+    }
+
+    /** Resolve the live container path, or null when the proxy is detached from the current root. */
+    private resolveMutationPath(context: ObservationContext): unknown[] | null {
+        if (context.generation !== this.#generation) {return null;}
+        return this.findCurrentPath(context);
     }
 
     /** Dispatch deep-mutation events only while the proxy still maps to current state. */
     private notifyMutation(
-        generation: number,
-        token: ObservationToken | undefined,
-        target: object,
-        containerPath: unknown[],
+        context: ObservationContext,
         operation: ModelMutation<T>['operation'],
-        path: unknown[],
+        relativePath: unknown[],
         oldValue: unknown,
         newValue: unknown
     ): void {
-        const resolvedPath = this.resolveMutationPath(generation, token, target, containerPath, path);
-        if (!resolvedPath) {return;}
-        const state = this.get();
+        const containerPath = this.resolveMutationPath(context);
+        if (!containerPath) {return;}
+        const state = this.modelData;
         const mutation: ModelMutation<T> = Object.freeze({
             operation,
-            path: Object.freeze(resolvedPath.slice()),
+            path: Object.freeze([...containerPath, ...relativePath]),
             oldValue,
             newValue,
             state
@@ -268,96 +317,125 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         this.#dispatchMessages(['mutate'], mutation);
     }
 
+    /** Return the cached proxy for one child, creating it lazily when the child is observable. */
+    #observeChild(cache: ObservedChildCache, context: ObservationContext, key: unknown, value: object): unknown {
+        const raw = toRawValue(value) as object;
+        const cached = cache.get(key);
+        if (cached !== undefined && cached.context.target === raw) {return cached.proxy;}
+        if (!this.isObservable(raw)) {return value;}
+        const child: ObservationContext = {
+            active: true,
+            generation: context.generation,
+            target: raw,
+            path: [...context.path, key],
+            key,
+            parent: context
+        };
+        const proxy = this.observe(raw, child);
+        cache.set(key, {proxy, context: child});
+        return proxy;
+    }
+
     /** Observe plain objects and arrays lazily along accessed branches. */
-    private observeObject(value: object, path: unknown[], generation: number, token?: ObservationToken): object {
+    private observeObject(value: object, context: ObservationContext): object {
         const childCache: ObservedChildCache = new Map();
-        if (path.length === 0) {this.#rootChildCache = childCache;}
+        if (!context.parent) {this.#rootChildCache = childCache;}
+        const isArray = Array.isArray(value);
         const proxy = new Proxy(value, {
             get: (target, property, receiver) => {
-                const hasOwnProperty = Object.prototype.hasOwnProperty.call(target, property);
-                if ((!Array.isArray(target) || this.isBlockedKey(property)) && !hasOwnProperty) {return undefined;}
-                const result = Reflect.get(target, property, receiver);
-                const rawResult = this.toRaw(result);
-                if (!this.isObservable(rawResult)) {return result;}
-                const cached = childCache.get(property);
-                if (cached && cached.raw === rawResult) {return cached.proxy;}
-                const childToken: ObservationToken = token ? {active: true, parent: token} : {active: true};
-                const childProxy = this.observe(rawResult, path.concat(property), generation, childToken);
-                childCache.set(property, {raw: rawResult, proxy: childProxy, token: childToken});
-                return childProxy;
+                const descriptor = Reflect.getOwnPropertyDescriptor(target, property);
+                if (!descriptor && (!isArray || isBlockedKey(property))) {return undefined;}
+                const result: unknown = descriptor && 'value' in descriptor
+                    ? descriptor.value
+                    : Reflect.get(target, property, receiver);
+                if (result === null || typeof result !== 'object') {return result;}
+                // Proxy invariants require frozen (non-configurable, non-writable) data to be returned as stored.
+                if (descriptor && descriptor.configurable === false && descriptor.writable === false) {return result;}
+                return this.#observeChild(childCache, context, property, result);
             },
             set: (target, property, nextValue) => {
-                if (this.isBlockedKey(property)) {return false;}
-                const rawNextValue = this.toRaw(nextValue);
-                const oldValue = this.toRaw(Reflect.get(target, property, target));
-                if (Object.is(oldValue, rawNextValue)) {return true;}
+                if (isBlockedKey(property)) {return false;}
+                const rawNextValue = toRawValue(nextValue);
+                const hadProperty = Object.prototype.hasOwnProperty.call(target, property);
+                const oldValue = hadProperty ? toRawValue(Reflect.get(target, property, target)) : undefined;
+                if (hadProperty && Object.is(oldValue, rawNextValue)) {return true;}
+                const oldLength = isArray ? (target as unknown[]).length : 0;
                 const applied = Reflect.set(target, property, rawNextValue, target);
                 if (applied) {
-                    if (Array.isArray(target) && property === 'length' && typeof rawNextValue === 'number' && rawNextValue < Number(oldValue)) {
-                        for (const key of [...childCache.keys()]) {
-                            const numericKey = typeof key === 'string' && key !== '' ? Number(key) : Number.NaN;
-                            if (Number.isInteger(numericKey) && numericKey >= rawNextValue) {this.invalidateObservedChild(childCache, key);}
-                        }
-                    } else {
-                        this.invalidateObservedChild(childCache, property);
-                    }
-                    this.notifyMutation(generation, token, target, path, 'set', path.concat(property), oldValue, rawNextValue);
+                    this.#invalidateWrittenProperty(childCache, target, property, oldLength);
+                    this.notifyMutation(context, 'set', [property], oldValue, rawNextValue);
                 }
                 return applied;
             },
+            defineProperty: (target, property, descriptor) => {
+                if (isBlockedKey(property)) {return false;}
+                const previous = Reflect.getOwnPropertyDescriptor(target, property);
+                const next = 'value' in descriptor ? {...descriptor, value: toRawValue(descriptor.value)} : descriptor;
+                const oldLength = isArray ? (target as unknown[]).length : 0;
+                if (!Reflect.defineProperty(target, property, next)) {return false;}
+                // Attribute changes such as freezing must also drop the cached child proxy.
+                this.#invalidateWrittenProperty(childCache, target, property, oldLength);
+                const current = Reflect.getOwnPropertyDescriptor(target, property)!;
+                const changed = !previous || !Object.is(previous.value, current.value) ||
+                    previous.get !== current.get || previous.set !== current.set;
+                if (changed) {
+                    this.notifyMutation(
+                        context,
+                        'set',
+                        [property],
+                        previous ? toRawValue(previous.value) : undefined,
+                        current.value
+                    );
+                }
+                return true;
+            },
             deleteProperty: (target, property) => {
                 if (!Object.prototype.hasOwnProperty.call(target, property)) {return true;}
-                const oldValue = this.toRaw(Reflect.get(target, property, target));
+                const oldValue = toRawValue(Reflect.get(target, property, target));
                 const removed = Reflect.deleteProperty(target, property);
                 if (removed) {
                     this.invalidateObservedChild(childCache, property);
-                    this.notifyMutation(generation, token, target, path, 'delete', path.concat(property), oldValue, undefined);
+                    this.notifyMutation(context, 'delete', [property], oldValue, undefined);
                 }
                 return removed;
-            }
+            },
+            // Replacing a state prototype would bypass the __proto__ write protection.
+            setPrototypeOf: (target, prototype) => Reflect.getPrototypeOf(target) === prototype
         });
-        this.#proxyTargets.set(proxy, value);
+        proxyTargets.set(proxy, value);
         return proxy;
     }
 
     /** Observe Map values and mutators without scanning unrelated entries. */
-    private observeMap(value: Map<unknown, unknown>, path: unknown[], generation: number, token?: ObservationToken): Map<unknown, unknown> {
+    private observeMap(value: Map<unknown, unknown>, context: ObservationContext): Map<unknown, unknown> {
         const childCache: ObservedChildCache = new Map();
-        if (path.length === 0) {this.#rootChildCache = childCache;}
-        const observeValue = (key: unknown, item: unknown): unknown => {
-            const rawItem = this.toRaw(item);
-            if (!this.isObservable(rawItem)) {return item;}
-            const cached = childCache.get(key);
-            if (cached && cached.raw === rawItem) {return cached.proxy;}
-            const childToken: ObservationToken = token ? {active: true, parent: token} : {active: true};
-            const childProxy = this.observe(rawItem, path.concat(key), generation, childToken);
-            childCache.set(key, {raw: rawItem, proxy: childProxy, token: childToken});
-            return childProxy;
-        };
+        if (!context.parent) {this.#rootChildCache = childCache;}
+        const observeValue = (key: unknown, item: unknown): unknown =>
+            item !== null && typeof item === 'object' ? this.#observeChild(childCache, context, key, item) : item;
         const proxy = new Proxy(value, {
             get: (target, property) => {
                 if (property === 'size') {return target.size;}
                 if (property === 'get') {return (key: unknown) => observeValue(key, target.get(key));}
                 if (property === 'set') {
                     return (key: unknown, nextValue: unknown) => {
-                        const rawNextValue = this.toRaw(nextValue);
+                        const rawNextValue = toRawValue(nextValue);
                         const hadKey = target.has(key);
-                        const oldValue = this.toRaw(target.get(key));
+                        const oldValue = toRawValue(target.get(key));
                         if (hadKey && Object.is(oldValue, rawNextValue)) {return proxy;}
                         this.invalidateObservedChild(childCache, key);
                         target.set(key, rawNextValue);
-                        this.notifyMutation(generation, token, target, path, 'set', path.concat(key), oldValue, rawNextValue);
+                        this.notifyMutation(context, 'set', [key], oldValue, rawNextValue);
                         return proxy;
                     };
                 }
                 if (property === 'delete') {
                     return (key: unknown) => {
                         if (!target.has(key)) {return false;}
-                        const oldValue = this.toRaw(target.get(key));
+                        const oldValue = toRawValue(target.get(key));
                         const removed = target.delete(key);
                         if (removed) {
                             this.invalidateObservedChild(childCache, key);
-                            this.notifyMutation(generation, token, target, path, 'delete', path.concat(key), oldValue, undefined);
+                            this.notifyMutation(context, 'delete', [key], oldValue, undefined);
                         }
                         return removed;
                     };
@@ -368,7 +446,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                         const oldValue = new Map(target);
                         target.clear();
                         for (const key of [...childCache.keys()]) {this.invalidateObservedChild(childCache, key);}
-                        this.notifyMutation(generation, token, target, path, 'clear', path, oldValue, target);
+                        this.notifyMutation(context, 'clear', [], oldValue, target);
                     };
                 }
                 if (property === 'forEach') {
@@ -390,13 +468,28 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 return typeof result === 'function' ? result.bind(target) : result;
             }
         });
-        this.#proxyTargets.set(proxy, value);
+        proxyTargets.set(proxy, value);
         return proxy;
     }
 
     /** Wrap one supported container lazily so mutations never require a full-tree scan. */
-    private observe(value: ModelData, path: unknown[], generation: number, token?: ObservationToken): object {
-        return isMap(value) ? this.observeMap(value, path, generation, token) : this.observeObject(value, path, generation, token);
+    private observe(value: ModelData, context: ObservationContext): object {
+        // Check the cheap object shapes first: a failed Map brand check throws, which is slow on fresh objects.
+        return Array.isArray(value) || isPlainObject(value)
+            ? this.observeObject(value, context)
+            : this.observeMap(value as Map<unknown, unknown>, context);
+    }
+
+    /** Observe a new root container for a new state generation. */
+    #observeRoot(value: ModelData): object {
+        return this.observe(value, {
+            active: true,
+            generation: this.#generation,
+            target: value,
+            path: [],
+            key: undefined,
+            parent: undefined
+        });
     }
 
     /** Replace all model state. */
@@ -404,7 +497,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         const rawData = this.toRaw(data);
         if (!this.isSupportedData(rawData) || !this.accepts(rawData)) {return false;}
         this.#generation += 1;
-        this.modelData = this.observe(rawData, [], this.#generation) as T;
+        this.modelData = this.#observeRoot(rawData) as T;
         if (!silent) {this.#dispatchMessages(['change', 'set'], this.get());}
         return true;
     }
@@ -423,15 +516,28 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return undefined;
     }
 
-    /** Shallow-merge an object root, or replace/merge one existing array or Map member. */
+    /** Shallow-merge an object root in place, or replace/merge one existing array or Map member. */
     update(keyOrData: unknown, dataOrSilent?: unknown, silent = false): boolean {
         const raw = this.rawState();
         if (isPlainObject(raw)) {
             if (!isPlainObject(keyOrData) ||
                 (dataOrSilent !== undefined && typeof dataOrSilent !== 'boolean') || arguments.length > 2) {return false;}
-            const candidate = extend(raw, keyOrData);
-            if (!this.accepts(candidate)) {return false;}
-            if (!this.set(candidate, true)) {return false;}
+            const writes: Array<[PropertyKey, PropertyDescriptor]> = [];
+            for (const [key, value] of mergeEntries(toRawValue(keyOrData) as object)) {
+                const descriptor = mergeDescriptor(raw, key, value);
+                if (!descriptor) {return false;}
+                writes.push([key, descriptor]);
+            }
+            if (this.validator) {
+                const candidate = cloneObjectState(raw);
+                for (const [key, descriptor] of writes) {Object.defineProperty(candidate, key, descriptor);}
+                if (!this.accepts(candidate)) {return false;}
+            }
+            // Mutating the root in place keeps retained root and nested proxies attached to current state.
+            for (const [key, descriptor] of writes) {
+                if (ownDataValue(raw, key) !== descriptor.value) {this.invalidateObservedChild(this.#rootChildCache, key);}
+                Object.defineProperty(raw, key, descriptor);
+            }
             if (dataOrSilent !== true) {this.#dispatchMessages(['change', 'update'], this.get());}
             return true;
         }
@@ -443,9 +549,11 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
             : Number.isInteger(keyOrData) && (keyOrData as number) >= 0 && (keyOrData as number) < (raw as unknown[]).length;
         if (!hasItem) {return false;}
         const current = isMapState ? raw.get(keyOrData) : (raw as unknown[])[keyOrData as number];
-        const nextValue = isPlainObject(current) && isPlainObject(dataOrSilent)
-            ? extend(current, dataOrSilent)
-            : this.toRaw(dataOrSilent);
+        const rawCurrent = this.toRaw(current);
+        const rawData = this.toRaw(dataOrSilent);
+        const nextValue = isPlainObject(rawCurrent) && isPlainObject(rawData)
+            ? extend(rawCurrent, rawData)
+            : rawData;
         if (this.validator) {
             const candidate = isMapState ? new Map(raw) : (raw as unknown[]).slice();
             if (isMapState) {(candidate as Map<unknown, unknown>).set(keyOrData, nextValue);}
@@ -538,7 +646,7 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
             if (!raw.delete(key)) {return false;}
             this.invalidateObservedChild(this.#rootChildCache, key);
         } else if (isArrayState) {
-            this.invalidateObservedArrayFrom(key as number);
+            this.invalidateObservedArrayFrom(this.#rootChildCache, key as number);
             raw.splice(key as number, 1);
         }
         else {
@@ -549,12 +657,14 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
         return true;
     }
 
-    /** Clear all state while preserving its object, array, or Map shape. */
+    /** Clear all state while preserving its object, array, or Map shape (including an object's prototype). */
     clear(silent = false): boolean {
         const raw = this.rawState();
-        const empty: ModelData = isMap(raw) ? new Map() : Array.isArray(raw) ? [] : {};
+        const empty: ModelData = isMap(raw)
+            ? new Map()
+            : Array.isArray(raw) ? [] : Object.create(Object.getPrototypeOf(raw)) as Record<PropertyKey, unknown>;
         this.#generation += 1;
-        this.modelData = this.observe(empty, [], this.#generation) as T;
+        this.modelData = this.#observeRoot(empty) as T;
         if (!silent) {this.#dispatchMessages(['change', 'clear'], this.get());}
         return true;
     }

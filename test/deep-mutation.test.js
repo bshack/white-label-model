@@ -346,7 +346,8 @@ describe('Model deep mutation tracking', function() {
 
         assert.equal(mutations.mock.callCount(), 0);
         assert.equal(getterCalls, 0);
-        assert.equal(descriptorCalls > 0, true);
+        // Rebasing checks only the stale proxy's observed parent, so it never descends into unrelated branches.
+        assert.equal(descriptorCalls, 0);
     });
 
     it('returns a stable proxy for repeated reads through the same parent', function() {
