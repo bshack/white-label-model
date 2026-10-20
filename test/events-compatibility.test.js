@@ -94,6 +94,28 @@ describe('Model EventTarget contract', () => {
         });
     }
 
+    for (const [label, data, key] of [
+        ['array', [{name: 'Ada'}], 0],
+        ['Map', new Map([['item', {name: 'Ada'}]]), 'item']
+    ]) {
+        it(`Model ${label}: silent collection operations apply state without events`, () => {
+            const model = new Model(data);
+            const calls = [];
+            for (const event of ['change', 'set', 'push', 'update', 'delete', 'clear', 'mutate']) {
+                model.addEventListener(event, () => calls.push(event));
+            }
+            assert.equal(model.update(key, {name: 'Grace'}, true), true);
+            assert.deepEqual(model.get(key), {name: 'Grace'});
+            assert.equal(label === 'Map' ? model.push('next', {name: 'Lin'}, true) : model.push({name: 'Lin'}, true), true);
+            assert.equal(label === 'Map' ? model.push(new Map([['more', 1]]), true) : model.push([1, 2], true), true);
+            assert.equal(model.delete(key, true), true);
+            assert.equal(label === 'Map' ? model.get().size : model.get().length, label === 'Map' ? 2 : 3);
+            assert.equal(model.set(label === 'Map' ? new Map() : [], true), true);
+            assert.equal(model.clear(true), true);
+            assert.deepEqual(calls, []);
+        });
+    }
+
     it('destroy clears every supported root shape and owned listener silently', () => {
         for (const instance of [new Model({name: 'Ada'}), new Model(['Ada']), new Model(new Map([['Ada', true]]))]) {
             const calls = [];

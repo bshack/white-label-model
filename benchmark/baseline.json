@@ -1,0 +1,14 @@
+{
+  "tolerance": 3,
+  "recordedWith": "Node.js v24.21.0",
+  "operations": {
+    "nested proxy read": 62.64,
+    "nested proxy mutation": 33.12,
+    "object update": 15.23,
+    "array member update": 19.27,
+    "Map member update": 18.96
+  },
+  "counters": {
+    "nested proxy mutation events": 250000
+  }
+}

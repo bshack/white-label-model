@@ -18,7 +18,7 @@ Each event is dispatched synchronously as a `CustomEvent`. The Model state or mu
 
 ## Local listener lifecycle
 
-Model inherits from native `EventTarget`. `addEventListener()` is overridden only to combine an optional caller-provided `AbortSignal` with the Model's own lifecycle signal. Native EventTarget owns registration identity, `once`, capture matching, cancellation behavior, and listener invocation.
+Model inherits from native `EventTarget`. Two methods are overridden: `addEventListener()` combines an optional caller-provided `AbortSignal` with the Model's own lifecycle signal, and `removeEventListener()` normalizes the `capture` option so Node.js matches browser removal behavior. Native EventTarget owns registration identity, `once`, capture matching, cancellation behavior, and listener invocation.
 
 `destroy()` silently clears Model state, aborts the Model-owned listener lifecycle, and leaves the same Model instance reusable. New listeners may be registered after destruction.
 
@@ -31,9 +31,11 @@ Supported runtimes therefore need native:
 
 ## Observable-root lifecycle
 
-Deep proxies belong to the root generation that created them. When `set()`, `clear()`, or `destroy()` replaces the root, a previously retained proxy still references its old JavaScript object, but it is detached from the Model event lifecycle. Mutating that detached object does not dispatch `change` or `mutate` for the current Model state.
+Deep proxies belong to the root generation that created them. When `set()`, `clear()`, or `destroy()` replaces the root, a previously retained proxy still references its old JavaScript object but is detached from the Model event lifecycle. Mutating that detached object does not dispatch `change` or `mutate` for the current Model state.
 
-This prevents stale references from reporting false current-state changes while keeping deep observation lazy and path-based.
+Object-root `update()` mutates the current root in place, so it does not start a new generation: retained root and nested proxies stay attached.
+
+Within one generation, a proxy can go stale when its object moves (for example an array item shifts after `delete()`) or when an alias is replaced. Before dispatching, Model walks back up the parents the proxy was reached through and looks for the object under its last known key, then under the other keys of that parent. If found, `mutate.detail.path` reports the current path; otherwise the write stays silent. A proxy whose ancestor was replaced by a different object stays silent even if its object is still reachable elsewhere. This keeps the check proportional to depth rather than state size, so deep observation stays lazy and path-based.
 
 ## Contract under test
 
@@ -55,7 +57,7 @@ The regression suite protects the behavior White Label depends on:
 - deep-mutation detail and mediator relay behavior; and
 - the same contract in supported Node runtimes without `window` or `document`.
 
-`test/browser-smoke.js` exercises the browser-facing EventTarget contract.
+`test/browser-smoke.js` exercises the browser-facing EventTarget contract. `npm run test:browser` runs it, plus nested-mutation, mediator-relay, AbortSignal, frozen-read, and in-place `update()` checks, in real Chromium against the esbuild-bundled package (`test/browser/`).
 
 ## Application mediator relay
 
@@ -97,16 +99,9 @@ model.addEventListener('change', event => {
 
 ## Validation
 
-Run:
-
 ```sh
 npm ci --ignore-scripts
-npm run lint
-npm run typecheck
-npm test
-npm run coverage
-npm run audit
-npm pack --dry-run
+npm run lint && npm run coverage && npm run audit
 ```
 
-Coverage remains 100% per implementation file. Dedicated runtime, type-consumer, browser-consumer, server-runtime, deep-mutation, detached-root, and mediator-relay tests protect the event boundary.
+`npm run coverage` includes the build, type checks, and every Node test, and keeps coverage at 100% per source file. Dedicated runtime, type-consumer, browser-consumer, server-runtime, deep-mutation, detached-root, and mediator-relay tests protect the event boundary.

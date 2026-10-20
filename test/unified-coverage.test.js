@@ -23,11 +23,14 @@ test('observable Map exposes native reads, iteration, callbacks, and mutations',
     assert.equal(mutations.at(-1).path[1], 'name');
 
     const visited = [];
-    map.forEach((value, key, receivedMap) => {
-        visited.push([key, value]);
+    const thisArg = {};
+    map.forEach(function(value, key, receivedMap) {
+        visited.push([key, value, this]);
         assert.equal(receivedMap, map);
-    });
+    }, thisArg);
     assert.equal(visited.length, 2);
+    assert.equal(visited[0][1], map.get('object'));
+    assert.equal(visited[0][2], thisArg);
 
     const values = [...map.values()];
     assert.equal(values.length, 2);
@@ -59,12 +62,18 @@ test('Map nested proxy cache refreshes when a key receives a different object', 
     assert.equal(second.name, 'Grace');
 });
 
-test('object update reports rejection if a stateful validator changes between checks', () => {
+test('object update runs the validator once and leaves state unchanged on rejection', () => {
     let checks = 0;
+    let accept = true;
     const model = new Model({name: 'Ada'}, () => {
         checks += 1;
-        return checks !== 3;
+        return accept;
     });
-    assert.equal(model.update({name: 'Grace'}), false);
-    assert.equal(model.get().name, 'Ada');
+    checks = 0;
+    assert.equal(model.update({name: 'Grace'}), true);
+    assert.equal(checks, 1);
+    accept = false;
+    assert.equal(model.update({name: 'Lin'}), false);
+    assert.equal(checks, 2);
+    assert.equal(model.get().name, 'Grace');
 });
