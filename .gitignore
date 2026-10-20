@@ -4,3 +4,6 @@ npm-debug.log
 # Local test output
 coverage/
 *.tgz
+
+# Compiler output (built by `npm run build`, `prepare`, and CI)
+dist/

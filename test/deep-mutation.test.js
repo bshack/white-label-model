@@ -346,7 +346,8 @@ describe('Model deep mutation tracking', function() {
 
         assert.equal(mutations.mock.callCount(), 0);
         assert.equal(getterCalls, 0);
-        assert.equal(descriptorCalls > 0, true);
+        // Rebasing checks only the stale proxy's observed parent, so it never descends into unrelated branches.
+        assert.equal(descriptorCalls, 0);
     });
 
     it('returns a stable proxy for repeated reads through the same parent', function() {
@@ -483,12 +484,35 @@ describe('Model deep mutation tracking', function() {
     });
 
     it('keeps deep writes effectively independent of unrelated model size', function() {
-        const unrelated = {};
+        const unrelatedState = {};
         for (let index = 0; index < 20000; index += 1) {
-            unrelated[`key${index}`] = index;
+            unrelatedState[`key${index}`] = index;
         }
-        const model = new Model({active: {count: 0}, unrelated});
-        const active = model.get().active;
+        // Count every reflective read so a descriptor-based scan or diff is caught even when it is fast.
+        let unrelatedReads = 0;
+        const unrelated = new Proxy(unrelatedState, {
+            get(target, property, receiver) {
+                unrelatedReads += 1;
+                return Reflect.get(target, property, receiver);
+            },
+            getOwnPropertyDescriptor(target, property) {
+                unrelatedReads += 1;
+                return Reflect.getOwnPropertyDescriptor(target, property);
+            },
+            ownKeys(target) {
+                unrelatedReads += 1;
+                return Reflect.ownKeys(target);
+            },
+            has(target, property) {
+                unrelatedReads += 1;
+                return Reflect.has(target, property);
+            }
+        });
+        // Unrelated state precedes the deeper active branch so any breadth-first scan must visit it.
+        const model = new Model({unrelated, nested: {active: {count: 0}}});
+        const mutations = mock.fn();
+        model.addEventListener('mutate', event => mutations(event.detail));
+        const active = model.get().nested.active;
         const start = performance.now();
         for (let index = 1; index <= 1000; index += 1) {
             active.count = index;
@@ -496,6 +520,62 @@ describe('Model deep mutation tracking', function() {
         const elapsed = performance.now() - start;
 
         assert.equal(active.count, 1000);
+        assert.equal(mutations.mock.callCount(), 1000);
+        assert.equal(unrelatedReads, 0, 'deep writes must not traverse unrelated state');
         assert.ok(elapsed < 2000, `1000 observed writes took ${elapsed.toFixed(1)}ms`);
+    });
+
+    it('dispatches change before mutate for direct nested writes, deletes, and Map clears', function() {
+        const model = new Model({profile: {name: 'Ada'}, lookup: new Map([['a', 1]])});
+        const calls = [];
+        model.addEventListener('change', event => {
+            assert.equal(event.detail, model.get());
+            calls.push('change');
+        });
+        model.addEventListener('mutate', event => calls.push(`mutate:${event.detail.operation}`));
+
+        model.get().profile.name = 'Grace';
+        delete model.get().profile.name;
+        model.get().lookup.clear();
+
+        assert.deepEqual(calls, ['change', 'mutate:set', 'change', 'mutate:delete', 'change', 'mutate:clear']);
+    });
+
+    it('reports direct Map#clear() with the cleared entries and the emptied Map', function() {
+        const model = new Model({lookup: new Map([['a', 1], ['b', 2]])});
+        const mutations = mock.fn();
+        model.addEventListener('mutate', event => mutations(event.detail));
+
+        model.get().lookup.clear();
+
+        assert.equal(mutations.mock.callCount(), 1);
+        const mutation = mutations.mock.calls[0].arguments[0];
+        assert.equal(mutation.operation, 'clear');
+        assert.deepEqual(mutation.path, ['lookup']);
+        assert.deepEqual([...mutation.oldValue], [['a', 1], ['b', 2]]);
+        assert.equal(mutation.newValue.size, 0);
+        assert.equal(mutation.state, model.get());
+    });
+
+    it('relays only when both name and mediator are configured', function() {
+        const mediator = new EventTarget();
+        const relayed = mock.fn();
+        mediator.addEventListener('model:profile:change', relayed);
+        mediator.addEventListener('model:false:change', relayed);
+
+        const unnamed = new Model({profile: {name: 'Ada'}});
+        unnamed.mediator = mediator;
+        unnamed.get().profile.name = 'Grace';
+        assert.equal(unnamed.set({name: 'Lin'}), true);
+
+        const unrelayed = new Model({profile: {name: 'Ada'}});
+        unrelayed.name = 'profile';
+        let localChanges = 0;
+        unrelayed.addEventListener('change', () => {localChanges += 1;});
+        unrelayed.get().profile.name = 'Grace';
+        assert.equal(unrelayed.set({name: 'Lin'}), true);
+
+        assert.equal(relayed.mock.callCount(), 0);
+        assert.equal(localChanges, 2);
     });
 });
