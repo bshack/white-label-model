@@ -57,7 +57,7 @@ The regression suite protects the behavior White Label depends on:
 - deep-mutation detail and mediator relay behavior; and
 - the same contract in supported Node runtimes without `window` or `document`.
 
-`test/browser-smoke.js` exercises the browser-facing EventTarget contract.
+`test/browser-smoke.js` exercises the browser-facing EventTarget contract. `npm run test:browser` runs it, plus nested-mutation, mediator-relay, AbortSignal, frozen-read, and in-place `update()` checks, in real Chromium against the esbuild-bundled package (`test/browser/`).
 
 ## Application mediator relay
 

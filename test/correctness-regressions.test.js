@@ -284,6 +284,42 @@ test('prototype replacement through a proxy is rejected', () => {
     assert.equal(model.get().polluted, undefined);
 });
 
+test('prototype replacement through a Map proxy is rejected', () => {
+    const model = new Model(new Map([['nested', new Map([['name', 'Ada']])]]));
+    const prototype = {polluted: true};
+    const root = model.get();
+    const nested = root.get('nested');
+
+    assert.throws(() => Object.setPrototypeOf(root, prototype), TypeError);
+    assert.throws(() => Object.setPrototypeOf(nested, prototype), TypeError);
+    assert.equal(Reflect.setPrototypeOf(root, Map.prototype), true);
+    assert.equal(Object.getPrototypeOf(root), Map.prototype);
+    assert.equal(Object.getPrototypeOf(nested), Map.prototype);
+    assert.equal(root.polluted, undefined);
+    assert.equal(root.get('nested').get('name'), 'Ada');
+});
+
+test('blocked keys cannot be written or defined on a Map proxy', () => {
+    const model = new Model(new Map([['name', 'Ada']]));
+    const root = model.get();
+    const prototype = {polluted: true};
+    const mutations = recordMutations(model);
+
+    for (const key of ['__proto__', 'constructor', 'prototype']) {
+        assert.equal(Reflect.set(root, key, prototype), false);
+        assert.equal(Reflect.defineProperty(root, key, {value: prototype, configurable: true}), false);
+        assert.equal(Object.prototype.hasOwnProperty.call(root, key), false);
+    }
+    assert.throws(() => {root.__proto__ = prototype;}, TypeError);
+    assert.equal(Object.getPrototypeOf(root), Map.prototype);
+    assert.equal(root.polluted, undefined);
+    assert.equal(root.get('name'), 'Ada');
+    assert.equal(mutations.length, 0);
+    // Ordinary non-blocked properties keep their previous behaviour.
+    assert.equal(Reflect.set(root, 'label', 'x'), true);
+    assert.equal(root.label, 'x');
+});
+
 test('clear preserves a null-prototype object root', () => {
     const state = Object.create(null);
     state.name = 'Ada';

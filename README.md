@@ -160,7 +160,7 @@ What is observed:
 - property assignment (including assigning `undefined` to a new key), `delete`, and `Object.defineProperty()` on objects and arrays, including writing an array's `length`;
 - `Map#set()`, `Map#delete()`, and `Map#clear()`.
 
-Assigning a value that is already stored does nothing. On object and array proxies, writes and definitions of `__proto__`, `constructor`, and `prototype` are rejected, and `Object.setPrototypeOf()` cannot change the prototype.
+Assigning a value that is already stored does nothing. On object, array, and Map proxies, writes and definitions of `__proto__`, `constructor`, and `prototype` are rejected, and `Object.setPrototypeOf()` cannot change the prototype.
 
 Reading notes:
 
@@ -268,9 +268,9 @@ npm ci --ignore-scripts
 npm run lint && npm run coverage && npm run audit
 ```
 
-`npm run coverage` builds (which typechecks), runs the consumer type checks and every Node test, and enforces 100% statements, branches, functions, and lines per source file, so `npm test` and `npm run typecheck` need no separate run. CI also tests Node 22.18.0, packs the package, and installs it with npm, Yarn, and pnpm.
+`npm run coverage` builds (which typechecks), runs the consumer type checks and every Node test, and enforces 100% statements, branches, functions, and lines per source file, so `npm test` and `npm run typecheck` need no separate run. CI also tests Node 22.18.0, packs the package, and installs it with npm, Yarn, and pnpm. It also runs `npm run test:browser` (the built package bundled with esbuild and exercised in real Chromium through Playwright) and `npm run bench:ci` (a reduced benchmark that fails only when an operation is more than 3x slower than `benchmark/baseline.json` or an event count changes).
 
-Source lives in `src/`. `dist/` is compiler output: edit TypeScript, never `dist/`. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Source lives in `src/`. `dist/` is compiler output and is not committed: `npm run build` (and `prepare`, for git installs) generates it. Edit TypeScript, never `dist/`. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Design boundary
 

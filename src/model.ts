@@ -512,7 +512,13 @@ class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
                 }
                 const result = Reflect.get(target, property, target);
                 return typeof result === 'function' ? result.bind(target) : result;
-            }
+            },
+            // Same blocked-key and prototype guards as object and array proxies; other properties keep default behaviour.
+            set: (target, property, nextValue, receiver) =>
+                !isBlockedKey(property) && Reflect.set(target, property, nextValue, receiver),
+            defineProperty: (target, property, descriptor) =>
+                !isBlockedKey(property) && Reflect.defineProperty(target, property, descriptor),
+            setPrototypeOf: (target, prototype) => Reflect.getPrototypeOf(target) === prototype
         });
         proxyTargets.set(proxy, value);
         return proxy;
