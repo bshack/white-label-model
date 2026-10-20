@@ -4,6 +4,10 @@ One observable Model for plain-object, array, or Map state with mutation events 
 
 Verified against `package.json`, `README.md`, `src/`, and `.github/workflows/security.yml` on October 19, 2026. Recheck those files when commands or supported environments change.
 
+## Response style
+
+The owner requires concise, neutral, evidence-based responses (October 12, 2026). Do not add personality, enthusiasm, flattery or filler.
+
 ## Code map
 
 - `src/model.ts`: the `Model` class (state API, lazy proxies, event dispatch). See `src/AGENTS.md`.
