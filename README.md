@@ -257,6 +257,24 @@ Node.js is the documented server runtime. The event boundary is standards-based,
 
 Proxies are created only for branches you access, and nested writes touch only the path involved. The test suite guards against whole-tree scans and copies with deterministic counters, and covers very deep paths, unrelated throwing getters, and large unrelated state. Run `npm run benchmark` to measure on your machine; listener work, validation, and path depth still affect real-world cost.
 
+### Coalescing several updates
+
+Every non-silent call dispatches its own `change`, so a bound View renders once per call. To make several writes produce one `change`, merge them into a single `update()`, or make every call but the last silent:
+
+```js
+// One change and one update event, carrying the final state.
+model.update({count: 3, status: 'loading', page: 2});
+
+// The same result when the writes happen in separate steps.
+model.update({count: 3}, true);
+model.update({status: 'loading'}, true);
+model.update({page: 2});
+```
+
+Silent calls still validate and write; they only skip events and mediator relays, so the last call must be non-silent for listeners to see the result. Direct writes through the state returned by `get()` (`model.get().count = 3`) always dispatch, so fold them into one `update()` when they need to coalesce.
+
+Measured with Model 7.1.0 and View 8.0.0 on Node 24.21, rendering a 50-item list, 3,000 groups of 10 writes: coalescing each group cut Server View time from 2,493 ms to 252 ms (30,001 renders to 3,001). In a browser, View's `batchUpdates: true` already coalesces renders into one animation frame, so this pattern matters most for Server View and for your own `change` listeners.
+
 ## Event contract
 
 Local events and mediator relays share the same `EventTarget`/`CustomEvent` semantics. See [`docs/events-compatibility.md`](docs/events-compatibility.md) for the full contract the tests protect.
