@@ -35,7 +35,7 @@ Deep proxies belong to the root generation that created them. When `set()`, `cle
 
 Object-root `update()` mutates the current root in place, so it does not start a new generation: retained root and nested proxies stay attached.
 
-Within one generation, a proxy can go stale when its object moves (for example an array item shifts after `delete()`) or when an alias is replaced. Before dispatching, Model walks back up the parents the proxy was reached through and looks for the object under its last known key, then under the other keys of that parent. If found, `mutate.detail.path` reports the current path; otherwise the write stays silent. A proxy whose ancestor was replaced by a different object stays silent even if its object is still reachable elsewhere. This keeps the check proportional to depth rather than state size, so deep observation stays lazy and path-based.
+Within one generation, a proxy can go stale when its object moves (for example an array item shifts after `delete()`) or when an alias is replaced. Before dispatching, Model walks back up the parents the proxy was reached through and looks for the object under its last known key, then under the other keys of that parent. If found, `mutate.detail.path` reports the current path; otherwise the write stays silent. A proxy whose ancestor was replaced by a different object stays silent even if its object is still reachable elsewhere. The common case is one lookup per level; when the last known key misses, only that parent's own keys are scanned, never unrelated branches or the whole tree. Deep observation stays lazy and path-based.
 
 ## Contract under test
 

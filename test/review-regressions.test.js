@@ -79,3 +79,73 @@ test('array update and delete reject invalid indexes without mutation', () => {
         assert.equal(model.get(), original);
     }
 });
+
+test('assigning modelData directly bypasses validation and observation', () => {
+    const model = new Model({name: 'Ada'}, data => typeof data.name === 'string');
+    let changes = 0;
+    model.addEventListener('change', () => changes++);
+    const replacement = {name: 42};
+    model.modelData = replacement;
+    assert.equal(model.get(), replacement);
+    model.get().name = 7;
+    assert.equal(changes, 0);
+    assert.equal(model.set({name: 'Grace'}), true);
+    assert.equal(changes, 1);
+});
+
+test('array and Map member update merges into a new object without non-enumerable or own __proto__ keys', () => {
+    const hidden = {a: 1};
+    Object.defineProperty(hidden, 'hidden', {value: 'h', writable: true, configurable: true, enumerable: false});
+    const parsed = JSON.parse('{"__proto__": {"x": 1}, "a": 1}');
+    const list = new Model([hidden, parsed]);
+    assert.equal(list.update(0, {a: 2}), true);
+    assert.equal(list.update(1, {a: 2}), true);
+    assert.equal(Object.getOwnPropertyDescriptor(list.get(0), 'hidden'), undefined);
+    assert.equal(Object.hasOwn(list.get(1), '__proto__'), false);
+    assert.equal(list.get(1).a, 2);
+
+    const map = new Model(new Map([['item', hidden]]));
+    assert.equal(map.update('item', {a: 3}), true);
+    assert.equal(Object.getOwnPropertyDescriptor(map.get('item'), 'hidden'), undefined);
+
+    const root = {a: 1};
+    Object.defineProperty(root, 'hidden', {value: 'h', writable: true, configurable: true, enumerable: false});
+    const object = new Model(root);
+    assert.equal(object.update({a: 2}), true);
+    assert.equal(Object.getOwnPropertyDescriptor(object.get(), 'hidden').value, 'h');
+});
+
+test('update with unchanged values still dispatches; a direct write of the stored value does not', () => {
+    const object = new Model({name: 'Ada'});
+    const events = [];
+    object.addEventListener('change', () => events.push('change'));
+    object.addEventListener('update', () => events.push('update'));
+    object.get().name = 'Ada';
+    assert.deepEqual(events, []);
+    assert.equal(object.update({name: 'Ada'}), true);
+    assert.deepEqual(events, ['change', 'update']);
+
+    const list = new Model([{v: 1}]);
+    const before = list.get(0);
+    let changes = 0;
+    list.addEventListener('change', () => changes++);
+    assert.equal(list.update(0, {v: 1}), true);
+    assert.equal(changes, 1);
+    assert.notEqual(list.get(0), before);
+});
+
+test('the validator candidate is a shallow copy that shares nested objects with live state', () => {
+    let calls = 0;
+    const model = new Model({nested: {x: 1}}, data => {
+        calls++;
+        if (calls === 1) {return true;}
+        data.nested.x = 999;
+        return false;
+    });
+    let changes = 0;
+    model.addEventListener('change', () => changes++);
+    assert.equal(model.update({y: 1}), false);
+    assert.equal(model.get().y, undefined);
+    assert.equal(model.get().nested.x, 999);
+    assert.equal(changes, 0);
+});

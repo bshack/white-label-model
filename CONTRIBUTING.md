@@ -32,4 +32,4 @@ Two further checks run in CI and can be run locally:
 
 ## Security
 
-The optional validator receives the complete proposed state before construction or an explicit mutation is committed; returning `false` rejects it. Use it for untrusted runtime data such as API, storage, or user input. Direct nested writes through `get()` do not run it. Never put real secrets or personal data in tests or docs, and report suspected vulnerabilities as described in [`SECURITY.md`](SECURITY.md).
+The optional validator receives the complete proposed state (a shallow copy, so validators must be pure) before construction or an explicit mutation is committed; returning `false` rejects it. Use it for untrusted runtime data such as API, storage, or user input. Direct nested writes through `get()` do not run it. Never put real secrets or personal data in tests or docs, and report suspected vulnerabilities as described in [`SECURITY.md`](SECURITY.md).

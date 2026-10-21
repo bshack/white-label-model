@@ -99,6 +99,7 @@ Omitting the initial state gives an empty object. Anything other than a plain ob
 | `initialize()` | No-op hook for lifecycle chaining. | The same Model. |
 | `addEventListener` / `removeEventListener` / `dispatchEvent` | Native `EventTarget` methods. | Native results. |
 | `name`, `mediator` | Optional properties for [mediator relays](#mediator-integration). | — |
+| `modelData` | The observable root state that `get()` returns. Treat it as read-only: assigning it directly skips observation, validation, and retained-proxy tracking, so use `set()` instead. | — |
 
 Pass `true` as the final `silent` argument to skip Model events for that call.
 
@@ -108,6 +109,8 @@ Pass `true` as the final `silent` argument to skip Model events for that call.
 - Only enumerable own keys of the input are merged. `__proto__`, `constructor`, and `prototype` are ignored.
 - On an object root, `update()` changes the existing root object **in place**. Proxies you obtained earlier from `get()` stay connected and keep emitting events, untouched properties keep their descriptors, and the validator runs once on the merged result.
 - Merged values are stored as data; existing setters on the state are not called.
+- On an array or Map root, a plain-object member is merged into a **new** object, so the member's identity changes. The new object copies only the current member's enumerable own keys, minus `__proto__`, `constructor`, and `prototype`: non-enumerable properties and an own `__proto__` key (for example from `JSON.parse`) are dropped. Use `set()` or a direct write through `get()` to keep them.
+- Every successful, non-silent `update()` dispatches its events, even when the merged values equal the stored ones. Direct writes through `get()` skip a value that is already stored.
 - It returns `false` and changes nothing if any merged key is read-only (a non-writable property or a non-configurable accessor), or would be new on a root that cannot gain properties (for example after `Object.preventExtensions()`, `Object.seal()`, or `Object.freeze()`).
 
 ## Events
@@ -175,7 +178,7 @@ Observation is path-based. A nested write never diffs or scans unrelated state, 
 You can keep a nested proxy (for example `const prefs = model.get().user.preferences`) and write through it later:
 
 - **After `set()`, `clear()`, or `destroy()`**, proxies from the previous root are detached. Writing through them still changes the old object, but no events are dispatched and the current state is untouched.
-- **After an array item moves or an alias is replaced**, Model re-finds the proxy's object by walking back up the parents it was reached through. Each level checks the last known key first, then the other keys of that one parent, so the cost depends on depth, not on state size. If the object is found, `mutate.detail.path` uses the current path.
+- **After an array item moves or an alias is replaced**, Model re-finds the proxy's object by walking back up the parents it was reached through. Each level checks the last known key first, then the other keys of that one parent. The common case costs one lookup per level; when the key has changed, that parent's keys are scanned, so the worst case grows with depth times the size of the parents involved. Unrelated branches are never scanned. If the object is found, `mutate.detail.path` uses the current path.
 - **Trade-off:** if an ancestor of the proxy was replaced by a different object, the proxy stays silent, even when its own object is still reachable through the replacement. Read the value again from `get()` to observe it.
 
 ## Runtime validation
@@ -195,6 +198,8 @@ user.set({name: 42});      // false, state unchanged
 ```
 
 The validator receives the **complete proposed state** before construction and before `set()`, `update()`, `push()`, and `delete()` commit. Rejected construction throws `TypeError`; a rejected mutation returns `false` and changes nothing.
+
+The proposed state is a shallow copy: nested objects are shared with the live state. Validators must be pure; one that mutates a nested value changes the real state, without an event, even when it returns `false`.
 
 Direct nested writes through `get()` are observed but **do not** run the validator; use the explicit methods when validation must be enforced. `clear()` and `destroy()` skip validation so cleanup can never be blocked.
 

@@ -174,7 +174,10 @@ function findChildKey(container: object, hint: unknown, child: object): unknown 
  * with `CustomEvent`s whose `detail` carries the state (or, for `mutate`, a description of the write).
  */
 class Model<T extends ModelData = Record<string, unknown>> extends EventTarget {
-    /** The observable root state. Prefer `get()` for reading it. */
+    /**
+     * The observable root state that `get()` returns. Treat this field as read-only: assigning it directly skips
+     * observation, validation, and retained-proxy tracking. Use `set()` to replace the state.
+     */
     modelData: T;
     /** Optional check run on the complete proposed state before explicit mutations commit. */
     validator: ((data: unknown) => boolean) | undefined;
